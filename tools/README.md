@@ -14,17 +14,39 @@ tribes/port/build.bat              # builds tribes/port/build/tribes_port.exe
 
 Regen rule: `python tools/rename_tribes.py && python tools/java2cpp.py`, then rebuild. **Never edit `tribes/src/` or `tribes/port/src/gen/` by hand.**
 
-## Scripts (planned)
+## Scripts
 
-| Script | Purpose |
-| --- | --- |
-| `extract_jar.py` | Unpack the user's JAR into `tribes/extracted/` (gitignored). A JAR is a plain zip. |
-| `decompile.py` | Run Vineflower 1.12.0 over the extracted classes (fetched via curl, gitignored). First compare its output with the existing CFR 0.152 decompile. |
-| `rename_tribes.py` | Class-file-level rename from `tribes/docs/names.map` + compile check against MIDP-2.0/CLDC-1.0 stub JARs. |
-| `java2cpp.py` | Mechanical Java → C++ translator (own implementation following the javalang pattern). |
-| `tribes_port_patches.py` | Counted patches applied inside the translator; a patch that matches the wrong number of times fails loudly. |
-| `parse_ma.py`, `parse_a_records.py`, `parse_sprites.py` | Asset-format parsers with exact-consumption asserts (formalized from the research repo's decoders). |
-| `outline.py` | Method list with line ranges, sizes, callers/callees. |
+| Script | Purpose | Status |
+| --- | --- | --- |
+| `rename_tribes.py` | Class-file-level rename from `tribes/docs/names.map` (via `ch_rename/TribesRenamer.java`) + compile check against MIDP stub JARs. Auto-generates mechanical names for colliding members the human map does not cover yet (see below). | Done |
+| `ch_rename/TribesRenamer.java` | Vineflower `IIdentifierRenamer` implementation, driven by `names.map`. Own code, written for this port. | Done |
+| `extract_jar.py` | Unpack the user's JAR into `tribes/extracted/` (gitignored). A JAR is a plain zip. | Planned |
+| `decompile.py` | Run Vineflower 1.12.0 over the extracted classes (fetched via curl, gitignored). | Planned |
+| `java2cpp.py` | Mechanical Java → C++ translator (own implementation following the javalang pattern). | Planned |
+| `tribes_port_patches.py` | Counted patches applied inside the translator; a patch that matches the wrong number of times fails loudly. | Planned |
+| `parse_ma.py`, `parse_a_records.py`, `parse_sprites.py` | Asset-format parsers with exact-consumption asserts (formalized from the research repo's decoders). | Planned |
+| `outline.py` | Method list with line ranges, sizes, callers/callees. | Planned |
+
+## Auto-generated names
+
+The raw decompile cannot compile as Java source: this obfuscator reuses one
+letter for many members in one class (185 collision groups, 542 members that
+must be renamed; plus overload groups whose call sites go ambiguous when
+arguments widen, e.g. `byte` → `int`). `rename_tribes.py` therefore builds
+the effective map as human `names.map` plus mechanical type-derived names
+for colliding members the human map does not cover yet, written to
+`tribes/docs/names-auto.map` (generated — do not edit by hand). As the human
+map grows, auto entries disappear. The counts are reported on every run.
+
+## MIDP stubs
+
+The compile check needs MIDP-2.0/CLDC-1.0 stub JARs. They are not committed
+(`tools/midp-stubs/` is gitignored). For this port they were built from
+hand-written stub sources (MIDP 2.0 public API, only the classes and members
+the game uses: `lcdui` Canvas/Display/Graphics/Image, `midlet` MIDlet,
+`rms` RecordStore, `media` Manager/Player/PlayerListener,
+`media.control` VolumeControl) — see the research working dir,
+`j2me-prehistoric-tribes/tools/midp-stubs-src/`.
 
 ## Toolchain
 
