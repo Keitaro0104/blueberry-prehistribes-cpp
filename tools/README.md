@@ -9,7 +9,8 @@ python tools/extract_jar.py        # unpack your jar from roms/
 python tools/decompile.py          # decompile -> tribes/decompiled/
 python tools/rename_tribes.py      # renamed Java -> tribes/src + compile check
 python tools/java2cpp.py           # -> tribes/port/src/gen
-tribes/port/build.bat              # builds tribes/port/build/tribes_port.exe
+tribes/port/build.bat              # builds tribes/port/build/Release/tribes.exe
+tools/run_linux_smoke.sh           # headless Linux smoke test (no Windows needed)
 ```
 
 Regen rule: `python tools/rename_tribes.py && python tools/java2cpp.py`, then rebuild. **Never edit `tribes/src/` or `tribes/port/src/gen/` by hand.**
@@ -22,7 +23,8 @@ Regen rule: `python tools/rename_tribes.py && python tools/java2cpp.py`, then re
 | `ch_rename/TribesRenamer.java` | Vineflower `IIdentifierRenamer` implementation, driven by `names.map`. Own code, written for this port. | Done |
 | `extract_jar.py` | Unpack the user's JAR into `tribes/extracted/` (gitignored). A JAR is a plain zip. | Planned |
 | `decompile.py` | Run Vineflower 1.12.0 over the extracted classes (fetched via curl, gitignored). | Planned |
-| `java2cpp.py` | Mechanical Java → C++ translator (own implementation following the javalang pattern). | Planned |
+| `java2cpp.py` | Mechanical Java → C++ translator (own implementation following the javalang pattern). Two passes (symbol tables, then emission); emits `tribes/port/src/gen/classes.h` + one `.cpp` per class. Handles the 13 platform-override methods, the three javalang parser patches (dropped `default:` labels, dropped prefix-before-cast, dropped prefix/selectors on parenthesized expressions), and the binary-operator sequencing guard (comma rewrite for `(V = X) OP R`). See `tribes/docs/TRANSLATOR-NOTES.md`. | Done |
+| `linux_smoke.cpp` + `run_linux_smoke.sh` | Headless Linux driver for the portable core (jrt/gfx/engine/platform/gen, no Win32 shell). Starts the game against the local extracted JAR contents, drives the repaint loop, dumps a BMP frame, reports screen/mode. Proves the game initializes, the loop runs, and the menu renders — the only functional validation possible without Windows. | Done |
 | `tribes_port_patches.py` | Counted patches applied inside the translator; a patch that matches the wrong number of times fails loudly. | Planned |
 | `parse_ma.py`, `parse_a_records.py`, `parse_sprites.py` | Asset-format parsers with exact-consumption asserts (formalized from the research repo's decoders). | Planned |
 | `outline.py` | Method list with line ranges, sizes, callers/callees. | Planned |
