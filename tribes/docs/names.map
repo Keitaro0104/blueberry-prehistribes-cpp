@@ -1,0 +1,20 @@
+# Rename map for Prehistoric Tribes.
+# Only members whose role was confirmed from call sites are renamed;
+# see CLASS_MAP.md for the evidence and for what is still unknown.
+# Anything not listed keeps its name.
+#
+# Format (one per line):
+#   class <old> <New>
+#   field <oldClass>.<oldField> <newName>
+#   method <oldClass>.<oldMethod>(<paramTypes>) <newName>
+
+class tribes TribesMIDlet
+class f Game
+class b World
+class e ResourceLoader
+class c TextLoader
+class d Splash
+class a MidiPlayer
+
+method b.ak() checkWinLose
+method f.aw() openCustomGame

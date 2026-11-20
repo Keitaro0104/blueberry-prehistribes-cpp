@@ -1,0 +1,25 @@
+# Original game data — never commit
+/roms/
+*.jar
+*.jad
+tribes/extracted/
+
+# Decompiler and stub jars (fetched, not committed)
+tools/vineflower.jar
+tools/midp-stubs/
+
+# Build output
+tribes/port/build/
+tribes/port/dist/
+build/
+out/
+
+# Runtime logs
+crash.txt
+exceptions.log
+bench.txt
+
+# IDE / OS
+.vs/
+*.user
+.DS_Store
