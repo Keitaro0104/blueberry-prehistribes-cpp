@@ -23,7 +23,7 @@ if "%VSCMD%"=="" (
 echo DIAG vcvars after vswhere VSCMD=%VSCMD%
 if "%VSCMD%"=="" (
   echo vcvars.bat: no Visual Studio with the C++ workload found.
-  echo Install Visual Studio 2022 (Desktop development with C++) and retry.
+  echo Install Visual Studio 2022 Desktop development with C++ and retry.
   exit /b 1
 )
 echo DIAG vcvars done VSCMD=%VSCMD%
