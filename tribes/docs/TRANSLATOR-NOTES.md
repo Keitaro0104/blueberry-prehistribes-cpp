@@ -186,6 +186,27 @@ indeterminately sequenced in C++ (not UB, but the order may differ
 from Java's left-to-right). The game does not rely on argument
 evaluation order in any site found so far.
 
+## Source corrections (counted patches in `tools/java2cpp.py`)
+
+Vineflower occasionally infers a local-variable type that the bytecode
+does not support. The renamed Java in `tribes/src/` keeps the
+decompiler's text verbatim, so corrections live in `SOURCE_PATCHES` in
+the translator, applied to the source text before parsing. Each patch
+must match exactly once in its file or the translator fails loudly, so
+a stale patch can never silently disappear and the generated code stays
+reproducible from `tribes/src/` plus that list. Never edit `tribes/src/`
+or `tribes/port/src/gen/` by hand.
+
+| # | Location | Correction | Evidence |
+| --- | --- | --- | --- |
+| 1 | `Game.renderWorldEntities`, screen-row pixel Y | `byte var2 = -16;` → `int var2 = -16;` | Vineflower said `byte`; CFR said `int`. The bytecode proves `int`: the increment is `iinc 2, 16` (plain integer increment, no `i2b` narrowing — javac only emits `iinc` when no narrowing is needed). With `byte`, Y wraps at 128, so every entity on screen rows ≥ 8 (pixel Y ≥ 128) is drawn off-screen and invisible — the tutorial-dialog glitch where villagers only appear after the cursor scrolls them into the top half of the screen. Verified locally 2026-11-20: before the fix, the playtest frame at the in-game tutorial shows zero villagers (9 exist, alive, in-grid, fog 0); after the fix the same frame shows the line of villagers in front of the hub. |
+
+Open audit: the other `int8_t` locals in the generated code were eyeballed
+after patch 1 and none is a pixel coordinate that can exceed 127, but no
+systematic Vineflower-vs-CFR type audit has been done yet. If another
+"invisible below a line" symptom appears, check the decompiler types
+against the bytecode (`iinc` vs `iadd`+`i2b`) first.
+
 ## Files
 
 | Path | What it is |

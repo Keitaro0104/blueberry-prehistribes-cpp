@@ -5002,7 +5002,7 @@ void Game::renderToBuffer() {
 
 void Game::renderWorldEntities() {
    int var1 = 0;
-   int8_t var2 = -16;
+   int var2 = -16;
    int8_t var4 = 0;
    int var5 = 0;
    try {

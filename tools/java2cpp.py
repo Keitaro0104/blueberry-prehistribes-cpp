@@ -15,6 +15,11 @@ Design (same pattern as the GOW Betrayal port, own implementation):
       - a unary prefix operator before a cast, e.g. `-(int)x`, is dropped
         by the stock parser (Cast has no prefix_operators slot); the patch
         moves the operator onto the cast's inner expression.
+  * Source corrections for decompiler errors live in SOURCE_PATCHES
+    (GOW-style counted patches): each must match exactly once in its
+    file or the translator fails loudly. The renamed Java in tribes/src/
+    keeps the decompiler's text verbatim; corrections are applied to the
+    source text before parsing, so the generated code is reproducible.
   * Two passes: first build a symbol table for every class (fields, methods,
     constructors, superclass, interfaces), then emit. Method calls are
     resolved against the table so the translator knows each call's return
@@ -80,6 +85,54 @@ OVERRIDES = {
     "TextLoader": set(),
     "ResourceLoader": set(),
 }
+
+# ---------------------------------------------------------------------------
+# Source corrections for decompiler errors (GOW-style counted patches).
+# Vineflower occasionally infers a local-variable type that the bytecode
+# does not support; the renamed Java in tribes/src/ keeps the decompiler's
+# text verbatim, so corrections live HERE, applied to the source text
+# before parsing. Each patch must match EXACTLY ONCE in its file, or the
+# translator fails loudly -- a stale patch can never silently disappear,
+# and the generated code stays reproducible from tribes/src/ plus this
+# list. Never edit tribes/src/ or tribes/port/src/gen/ by hand.
+# ---------------------------------------------------------------------------
+SOURCE_PATCHES = [
+    # 1. Game.renderWorldEntities: the screen-row pixel Y must be int.
+    #    Vineflower wrote `byte var2 = -16;`; CFR wrote `int n2 = -16;`.
+    #    The bytecode proves int: the increment is `iinc 2, 16` (a plain
+    #    integer increment with no i2b narrowing -- javac only emits iinc
+    #    when no narrowing is needed). With byte, Y wraps at 128, so
+    #    every entity on screen rows >= 8 (pixel Y >= 128) is drawn
+    #    off-screen and invisible -- the tutorial-dialog glitch where
+    #    villagers only appear after the cursor scrolls them into the
+    #    top half of the screen.
+    ("Game.java",
+     "   private void renderWorldEntities() {\n      int var1 = 0;\n      byte var2 = -16;",
+     "   private void renderWorldEntities() {\n      int var1 = 0;\n      int var2 = -16;"),
+]
+
+
+def apply_source_patches(name, src):
+    """Apply SOURCE_PATCHES for one file; fail loudly on a stale patch."""
+    for fname, old, new in SOURCE_PATCHES:
+        if fname != name + ".java":
+            continue
+        count = src.count(old)
+        if count != 1:
+            raise TranslateError(
+                "%s: source patch did not match exactly once (found %d): %r"
+                % (fname, count, old[:60]))
+        src = src.replace(old, new, 1)
+    return src
+
+
+def read_source(name):
+    """Read a renamed Java file with source corrections applied."""
+    path = os.path.join(SRC_DIR, name + ".java")
+    with open(path, "r", encoding="utf-8") as f:
+        src = f.read()
+    return apply_source_patches(name, src)
+
 
 # ---------------------------------------------------------------------------
 # javalang patches (see the module docstring). These fix two parser bugs
@@ -565,8 +618,7 @@ def _modifiers(node):
 def build_symbol_tables():
     for name in CLASSES:
         path = os.path.join(SRC_DIR, name + ".java")
-        with open(path, "r", encoding="utf-8") as f:
-            src = f.read()
+        src = read_source(name)
         tree = javalang.parse.parse(src)
         decl = None
         for _, node in tree.filter(T.ClassDeclaration):
@@ -1707,8 +1759,7 @@ def main(argv):
     trees = {}
     for name in CLASSES:
         path = os.path.join(SRC_DIR, name + ".java")
-        with open(path, "r", encoding="utf-8") as f:
-            src = f.read()
+        src = read_source(name)
         tree = javalang.parse.parse(src)
         trees[name] = tree
         problems.extend(preflight(tree, path))
