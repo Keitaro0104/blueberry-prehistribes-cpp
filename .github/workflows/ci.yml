@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build dist
+        run: tribes\port\build_dist.bat
+        shell: cmd
+
+      - name: Verify dist
+        # check_dist.ps1 checks both exes are 64-bit PEs. The --dump/--bench
+        # smoke tests are skipped in CI (PARTIAL) because the game data
+        # lives in the user's JAR and is never committed to the repo.
+        run: powershell -ExecutionPolicy Bypass -File tribes\port\check_dist.ps1
+        shell: powershell
+
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-dist
+          path: tribes/port/dist
