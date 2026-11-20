@@ -28,7 +28,7 @@ LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
          BeginPaint(hwnd, &ps);
          if (g_winDisplay && g_winDisplay->screen()) {
             // Re-present the last frame under the screen mutex.
-            std::lock_guard<std::mutex> lock(g_winDisplay->screenMutex());
+            std::lock_guard<std::mutex> lock(screenMutex());
             g_winDisplay->present(*g_winDisplay->screen());
          }
          EndPaint(hwnd, &ps);

@@ -35,9 +35,6 @@ class WinDisplay {
    void setScreen(const Surface* screen) { screen_ = screen; }
    const Surface* screen() const { return screen_; }
 
-   // The process-wide screen mutex (see screenMutex() above).
-   std::mutex& screenMutex() { return ::screenMutex(); }
-
   private:
    void updateClientSize();
    RECT destRect() const;  // letterboxed destination for the 240x320 frame
