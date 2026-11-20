@@ -25,7 +25,11 @@
 #include <string>
 #include <vector>
 
+// puff is C (puff.c): declare it with C linkage so the C++ linker finds
+// the unmangled symbol (otherwise the launcher fails with LNK2019).
+extern "C" {
 #include "puff.h"
+}
 
 namespace {
 
