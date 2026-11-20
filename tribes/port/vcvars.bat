@@ -1,5 +1,5 @@
 @echo off
-REM vcvars.bat — locate the Visual Studio C++ environment and load it.
+REM vcvars.bat - locate the Visual Studio C++ environment and load it.
 REM The environment changes must persist to the caller, so the search
 REM runs inside a setlocal block and only the found path escapes it
 REM (the classic "endlocal & set" trick).

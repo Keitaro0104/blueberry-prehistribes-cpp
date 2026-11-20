@@ -1,5 +1,5 @@
 @echo off
-REM build_dist.bat — build Release, then assemble a self-contained dist
+REM build_dist.bat - build Release, then assemble a self-contained dist
 REM folder (tribes.exe + tribes-launcher.exe + README) that can be zipped
 REM and shared. No installer; the user runs tribes-launcher.exe first.
 setlocal

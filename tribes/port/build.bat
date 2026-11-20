@@ -1,5 +1,5 @@
 @echo off
-REM build.bat — configure + build the port (MSVC, Release, x64, static CRT).
+REM build.bat - configure + build the port (MSVC, Release, x64, static CRT).
 REM Requires Visual Studio with the C++ workload (see vcvars.bat).
 setlocal
 call "%~dp0vcvars.bat" || exit /b 1
