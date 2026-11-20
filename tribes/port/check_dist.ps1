@@ -1,4 +1,4 @@
-# check_dist.ps1 — verify a built dist folder (run after build_dist.bat).
+# check_dist.ps1 - verify a built dist folder (run after build_dist.bat).
 # Checks the executables exist, are 64-bit, and that the headless smoke
 # tests pass: --dump writes a non-blank frame, --bench runs the loop.
 # Usage: powershell -ExecutionPolicy Bypass -File check_dist.ps1 [-Dist <path>]
@@ -22,10 +22,10 @@ foreach ($exe in "tribes.exe", "tribes-launcher.exe") {
 
 # The smoke tests need game data. If there is no data folder yet, create
 # one from the local extracted JAR contents (CI does the same from its
-# own checkout — the data is never committed to the repo).
+# own checkout - the data is never committed to the repo).
 $dataDir = "$Dist\data"
 if (-not (Test-Path "$dataDir\ma")) {
-    Write-Host "no game data in $dataDir — skipping --dump/--bench (run the launcher first, or copy extracted JAR files into $dataDir)"
+    Write-Host "no game data in $dataDir - skipping --dump/--bench (run the launcher first, or copy extracted JAR files into $dataDir)"
     Write-Host "check_dist.ps1: PARTIAL (binaries OK, smoke tests skipped)"
     exit 0
 }
@@ -52,7 +52,7 @@ Write-Host "--dump OK ($size bytes, $($distinct.Count) distinct sampled colours)
 $bench = & "$Dist\tribes.exe" --bench 5 2>&1
 Write-Host $bench
 if ($bench -notmatch "(\d+) frames presented") { Fail "--bench printed no frame count" }
-if ([int]$Matches[1] -le 0) { Fail "--bench presented 0 frames — the game loop did not run" }
+if ([int]$Matches[1] -le 0) { Fail "--bench presented 0 frames - the game loop did not run" }
 Write-Host "--bench OK ($($Matches[1]) frames in 5s)"
 
 Write-Host "check_dist.ps1: PASS"
