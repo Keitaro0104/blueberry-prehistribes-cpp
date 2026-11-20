@@ -4255,7 +4255,7 @@ void Game::openCustomGame() {
       (this->screenId = 3);
       (this->menuCursor = 0);
    } else {
-      if (((this->campaignProgress <= 0) && !this->cheatUnlockedCustom)) {
+      if (false) {
          (this->dialogId = 70);
          (this->screenId = 21);
          (this->menuCursor = 0);

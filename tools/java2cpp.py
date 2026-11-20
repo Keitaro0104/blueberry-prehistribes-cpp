@@ -100,6 +100,12 @@ OVERRIDES = {
 # tribes/docs/MOD-LOADER-DESIGN.md). They are not decompiler-error
 # corrections -- they wire the hand-written ModLoader into the generated
 # code at the four engine seams. The same exactly-once rule applies.
+#
+# Patch 7 is a third kind: an INTENTIONAL BEHAVIOR CHANGE, not a
+# decompiler-error correction and not a loader hook. It is the port
+# equivalent of the 1-byte JAR unlock (see
+# mods/example/UNLOCKED-PROOF.md in the research repo). Removing the
+# patch entry + regen restores the original behavior exactly.
 # ---------------------------------------------------------------------------
 SOURCE_PATCHES = [
     # 1. Game.renderWorldEntities: the screen-row pixel Y must be int.
@@ -150,6 +156,19 @@ SOURCE_PATCHES = [
     ("TextLoader.java",
      "            this.inputStream.close();\n            this.inputStream = null;\n         } catch (IOException var3) {",
      "            this.inputStream.close();\n            this.inputStream = null;\n            if (var1 == 0) {\n               ModLoader.reapplyMapNames(this.game);\n            }\n         } catch (IOException var3) {"),
+    # 7. Game.openCustomGame: INTENTIONAL BEHAVIOR CHANGE (not a
+    #    decompiler correction). The tutorial gate -- Custom Game is
+    #    locked while campaignProgress <= 0 (fresh profile) and
+    #    cheatUnlockedCustom is never set -- is disabled so the Custom
+    #    Game list opens on a fresh profile. Mirrors the 1-byte JAR
+    #    unlock (f.class aw(): ifgt -> ifge; see
+    #    mods/example/UNLOCKED-PROOF.md in the research repo). The gate
+    #    branch stays in the source as dead code; removing this entry
+    #    + regen restores the original gate exactly. The tutorial
+    #    itself is untouched (New Game still starts it).
+    ("Game.java",
+     "      } else if (this.campaignProgress <= 0 && !this.cheatUnlockedCustom) {",
+     "      } else if (false) {"),
 ]
 
 

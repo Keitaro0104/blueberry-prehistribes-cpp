@@ -224,6 +224,28 @@ systematic Vineflower-vs-CFR type audit has been done yet. If another
 "invisible below a line" symptom appears, check the decompiler types
 against the bytecode (`iinc` vs `iadd`+`i2b`) first.
 
+## Intentional behavior changes (counted patches in `tools/java2cpp.py`)
+
+A third kind of patch entry: deliberate changes to what the game does
+— neither a decompiler-error correction nor a mod-loader hook. They
+exist because the port is also a test bed (the user has no PC and tests
+in Winlator), so a behavior that blocks testing may be switched off
+here. Each one is a counted `SOURCE_PATCHES` entry with the same
+exactly-once rule, and each is trivially reversible: delete the entry
+from `tools/java2cpp.py` and rerun `python3 tools/java2cpp.py` — the
+original code stays in `tribes/src/` untouched, and the patched-out
+branch stays in the generated code as dead code. A behavior change
+must never be hidden inside a correction patch; it gets its own entry
+and its own row here.
+
+| # | Location | Change | Why, and how it was verified |
+| --- | --- | --- | --- |
+| 7 | `Game.openCustomGame`, the tutorial gate | `else if (this.campaignProgress <= 0 && !this.cheatUnlockedCustom)` → `else if (false)` | The gate locks Custom Game on a fresh profile (`campaignProgress` is 0 until the tutorial is passed; `cheatUnlockedCustom` is never set). That blocks testing Custom Game mods (e.g. Green Valley) without playing a full tutorial mission first. Mirrors the 1-byte JAR unlock (`f.class` `aw()`: `ifgt` → `ifge`; see `mods/example/UNLOCKED-PROOF.md` in the research repo). Verified behaviorally 2026-11-20 with a scripted driver (`~/workspace/tribes-playtest/unlock_test.cpp`, fresh profile, menu path 14 language → 16 title → 0 main menu → action 0 → 2 Play submenu → action 13 Custom Game): patched build reaches screen 13 (difficulty), exit 0; the same driver against a regen without this patch reaches screen 21 + dialog 70 ("pass the tutorial first!"), exit 1 — the only difference between the two binaries is this one line. The tutorial itself is untouched: the existing playtest driver (FIRE-mash, New Game path) still reaches mode 1 at ~60 s on the 40x32 tutorial map (scene 3). Linux smoke test and mod test still pass. |
+
+To restore the original gate: delete patch 7 from `SOURCE_PATCHES` in
+`tools/java2cpp.py` and rerun `python3 tools/java2cpp.py`. No other
+file needs to change.
+
 ## Files
 
 | Path | What it is |
