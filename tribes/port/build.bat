@@ -7,7 +7,7 @@ echo DIAG build calling vcvars.bat
 call "%~dp0vcvars.bat" || exit /b 1
 echo DIAG build vcvars returned errorlevel=%ERRORLEVEL%
 echo DIAG build running cmake configure
-cmake -S "%~dp0" -B "%~dp0build" -A x64 || exit /b 1
+cmake -S "%~dp0." -B "%~dp0build" -A x64 || exit /b 1
 echo DIAG build cmake configure done
 cmake --build "%~dp0build" --config Release || exit /b 1
 echo Build OK: %~dp0build\Release\tribes.exe
