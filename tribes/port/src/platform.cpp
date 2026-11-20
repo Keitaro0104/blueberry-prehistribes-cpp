@@ -7,6 +7,8 @@
 #include <cstdio>
 #include <filesystem>
 
+#include "crashlog.h"
+
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -211,6 +213,9 @@ class WinMidiPlayer : public Player {
       if (getState() != 300) return;
       if (parseFailed_ || events_.empty()) {
          // Nothing to play: behave as if the song ended immediately.
+         crashlog::log(
+             "MIDI: no playable events (%s); playing silent",
+             parseFailed_ ? "song failed to parse" : "song has no events");
          setState(300);
          return;
       }
@@ -249,7 +254,14 @@ class WinMidiPlayer : public Player {
    }
 
    void applyVolume() {
-      if (midiOutOpen(&out_, MIDI_MAPPER, 0, 0, CALLBACK_NULL) != MMSYSERR_NOERROR) {
+      // Logged (not silent): a missing MIDI device is the prime suspect
+      // when the game has no sound, and the error code says why.
+      UINT devs = midiOutGetNumDevs();
+      MMRESULT rc = midiOutOpen(&out_, MIDI_MAPPER, 0, 0, CALLBACK_NULL);
+      if (rc != MMSYSERR_NOERROR) {
+         crashlog::log(
+             "MIDI: midiOutOpen FAILED, error=%u (devices available: %u)",
+             (unsigned)rc, (unsigned)devs);
          out_ = nullptr;
          return;
       }
@@ -258,6 +270,9 @@ class WinMidiPlayer : public Player {
       if (level > 100) level = 100;
       DWORD v = (DWORD)(level * 0xFFFF / 100);
       midiOutSetVolume(out_, v | (v << 16));
+      crashlog::log("MIDI: midiOutOpen OK (MIDI_MAPPER, devices: %u), "
+                    "volume=%d%%",
+                    (unsigned)devs, level);
    }
 
    void sendAllNotesOff() {

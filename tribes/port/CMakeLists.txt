@@ -30,6 +30,7 @@ add_executable(tribes WIN32
    src/gfx.cpp
    src/engine.cpp
    src/platform.cpp
+   src/crashlog.cpp
    src/display.cpp
    src/input.cpp
    src/main.cpp

@@ -26,6 +26,7 @@
 #include <string>
 #include <thread>
 
+#include "crashlog.h"
 #include "engine.h"
 #include "gen/classes.h"
 #include "gfx.h"
@@ -107,6 +108,11 @@ int main(int argc, char** argv) {
    Platform::saveDir = saveDir;
    Platform::userDir = saveDir;
 
+   // Exercise the session logger too (log lands in the saves dir).
+   crashlog::init(saveDir);
+   crashlog::log("linux_smoke: data=%s saves=%s seconds=%.0f",
+                 dataDir.c_str(), saveDir.c_str(), seconds);
+
    Canvas::setRepaintCallback(presentFrame);
 
    std::printf("linux_smoke: data=%s saves=%s seconds=%.0f\n",
@@ -164,5 +170,6 @@ int main(int argc, char** argv) {
    Thread::joinAll();
    std::printf("linux_smoke: OK (%lld frames presented)\n",
                (long long)g_frames.load());
+   crashlog::shutdown("normal exit");
    return 0;
 }

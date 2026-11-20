@@ -29,9 +29,11 @@
 #include <chrono>
 #include <cstdarg>
 #include <cstdio>
+#include <filesystem>
 #include <string>
 #include <thread>
 
+#include "crashlog.h"
 #include "display.h"
 #include "engine.h"
 #include "gen/classes.h"
@@ -45,11 +47,16 @@ std::atomic<long long> g_framesPresented{0};
 bool g_trace = false;
 
 void trace(const char* fmt, ...) {
-   if (!g_trace) return;
+   // Every stage line goes to tribes-log.txt (always); it also goes to
+   // stdout when --trace was passed (the old behaviour).
+   char buf[2048];
    va_list ap;
    va_start(ap, fmt);
-   std::vprintf(fmt, ap);
+   std::vsnprintf(buf, sizeof(buf), fmt, ap);
    va_end(ap);
+   crashlog::log("%s", buf);
+   if (!g_trace) return;
+   std::fputs(buf, stdout);
    std::fflush(stdout);
 }
 
@@ -71,7 +78,17 @@ bool dirHasGameData(const std::string& dir) {
       DWORD attr = GetFileAttributesA(path.c_str());
       if (attr == INVALID_FILE_ATTRIBUTES) {
          std::fprintf(stderr, "missing game data file: %s\n", path.c_str());
+         crashlog::log("data file %s: MISSING", f);
          ok = false;
+      } else {
+         std::error_code ec;
+         auto size = std::filesystem::file_size(path, ec);
+         if (ec) {
+            crashlog::log("data file %s: present (size unknown)", f);
+         } else {
+            crashlog::log("data file %s: OK (%llu bytes)",
+                          f, (unsigned long long)size);
+         }
       }
    }
    return ok;
@@ -177,6 +194,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR cmdLine, int) {
    Platform::saveDir = saveDir;
    Platform::userDir = exeDir;
 
+   // Start the session log first: from here on, every stage is recorded
+   // in <exe>\tribes-log.txt, even if the game crashes later.
+   crashlog::init(exeDir);
+   trace("exe dir: %s\n", exeDir.c_str());
    trace("data dir: %s\n", dataDir.c_str());
    trace("save dir: %s\n", saveDir.c_str());
    if (!dirHasGameData(dataDir)) {
@@ -184,6 +205,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR cmdLine, int) {
                    "Game data not found. Run the launcher first (it "
                    "extracts your JAR into the data folder), or pass "
                    "--data <dir>.\n");
+      crashlog::log("ERROR: game data not found, exiting");
+      crashlog::shutdown("missing game data");
       return 1;
    }
 
@@ -191,10 +214,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR cmdLine, int) {
    if (!headless) {
       if (!display.create("Prehistoric Tribes")) {
          std::fprintf(stderr, "failed to create the window\n");
+         crashlog::log("ERROR: failed to create the window, exiting");
+         crashlog::shutdown("window creation failed");
          return 1;
       }
       g_winDisplay = &display;
       display.setScreen(&g_screen);
+      trace("window created (scale=%d, fullscreen=%d)\n", scale,
+            fullscreen ? 1 : 0);
    }
 
    Canvas::setRepaintCallback(presentFrame);
@@ -260,5 +287,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR cmdLine, int) {
                   (long long)g_framesPresented.load(), secs,
                   secs > 0 ? g_framesPresented.load() / secs : 0.0);
    }
+   crashlog::shutdown("normal exit");
    return 0;
 }

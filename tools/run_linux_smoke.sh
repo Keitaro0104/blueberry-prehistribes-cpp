@@ -41,7 +41,7 @@ echo "== compiling the portable core + smoke driver =="
 g++ -std=c++17 -O1 -Wall -Wno-unused-parameter \
   -I"$PORT/src" -I"$PORT/third_party/stb" \
   "$PORT/src/jrt.cpp" "$PORT/src/gfx.cpp" "$PORT/src/engine.cpp" \
-  "$PORT/src/platform.cpp" "$PORT/src/gen/Game.cpp" \
+  "$PORT/src/platform.cpp" "$PORT/src/crashlog.cpp" "$PORT/src/gen/Game.cpp" \
   "$PORT/src/gen/World.cpp" "$PORT/src/gen/MidiPlayer.cpp" \
   "$PORT/src/gen/TextLoader.cpp" "$PORT/src/gen/ResourceLoader.cpp" \
   "$PORT/src/gen/Splash.cpp" "$PORT/src/gen/TribesMIDlet.cpp" \

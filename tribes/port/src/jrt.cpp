@@ -5,6 +5,8 @@
 #include <chrono>
 #include <cstdio>
 
+#include "crashlog.h"
+
 namespace jrt {
 
 // ---------------------------------------------------------------------------
@@ -385,7 +387,20 @@ std::mutex Thread::threadsMutex_;
 void Thread::start() {
    Runnable* target = target_;
    std::lock_guard<std::mutex> lock(threadsMutex_);
-   threads_.emplace_back([target]() { target->run(); });
+   // A C++ exception escaping the game thread would otherwise terminate
+   // the process silently: log it first, then rethrow so the terminate
+   // handler still writes the full CRASH report to tribes-log.txt.
+   threads_.emplace_back([target]() {
+      try {
+         target->run();
+      } catch (const std::exception& e) {
+         crashlog::logThreadException(e.what());
+         throw;
+      } catch (...) {
+         crashlog::logThreadException("unknown (non-std) exception");
+         throw;
+      }
+   });
 }
 
 void Thread::yield() { std::this_thread::yield(); }
