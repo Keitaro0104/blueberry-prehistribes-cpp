@@ -200,6 +200,23 @@ or `tribes/port/src/gen/` by hand.
 | # | Location | Correction | Evidence |
 | --- | --- | --- | --- |
 | 1 | `Game.renderWorldEntities`, screen-row pixel Y | `byte var2 = -16;` → `int var2 = -16;` | Vineflower said `byte`; CFR said `int`. The bytecode proves `int`: the increment is `iinc 2, 16` (plain integer increment, no `i2b` narrowing — javac only emits `iinc` when no narrowing is needed). With `byte`, Y wraps at 128, so every entity on screen rows ≥ 8 (pixel Y ≥ 128) is drawn off-screen and invisible — the tutorial-dialog glitch where villagers only appear after the cursor scrolls them into the top half of the screen. Verified locally 2026-11-20: before the fix, the playtest frame at the in-game tutorial shows zero villagers (9 exist, alive, in-grid, fog 0); after the fix the same frame shows the line of villagers in front of the hub. |
+| 2 | `ResourceLoader` ctor, after `loadMaps()` | Added `ModLoader.applyMods(this.game);` | Mod-loader hook (Seam 2/§5, design `tribes/docs/MOD-LOADER-DESIGN.md`): applies the map overrides once, after every base table is loaded. No-op when no map mods are enabled. |
+| 3 | `ResourceLoader.loadSpritePack`, inside `if (var3 < 27)` | After `Image.createImage(...)`, added `Image modImage = ModLoader.spriteOverride(this.game, this.currentPackIndex, var3, ...); if (modImage != null) { ... = modImage; }` | Mod-loader hook (Seam 2): per-sprite PNG replacement. The base image is decoded first so the hook can check the replacement's dimensions against it. |
+| 4 | `Game.c_byte_void` (lazy pi8 load), inside `if (var10 == var1)` | Same `spriteOverride` hook with `(this, 2, var1, ...)` after the `Image.createImage` | Mod-loader hook (Seam 2): the story/cutscene pack is loaded lazily, so it needs its own hook; the requested image lands at `spritePacks[2][0]`, so the override key is (pack 2, `var1`). |
+| 5 | `Game.loadMap`, RLE fetch `if (var7 >= ...)` | Added a preceding branch: `if (ModLoader.hasModMap(this.missionIndex)) { var1 = ModLoader.modMapTile(...); } else if (var7 >= ...)` | Mod-loader hook (Seam 3): the tile source for mod maps. The translator emits the `else if` as `else { if (...) {...} }` — semantically identical; the rest of the loop body (jitter, markers, spawn registration, borders) is shared by both paths. `/ma` and rec 248 are never touched. |
+| 6 | `TextLoader.loadTextFile`, after `inputStream = null` | Added `if (var1 == 0) { ModLoader.reapplyMapNames(this.game); }` | Mod-loader hook: picking a language reloads the `s` file from the base data, which would wipe the map-name patches `applyMods` made. No-op when no map mods are enabled. |
+
+Patches 2–6 are a second kind of entry: not decompiler-error
+corrections, but the wiring that connects the hand-written
+`ModLoader` (`tribes/port/src/modloader.h/.cpp`) into the generated
+code at the four engine seams. The same exactly-once rule applies,
+and the `gen/` diff of a regen must be only the hook lines
+(verified 2026-11-20: regen produced 12,409 lines, +16 vs 12,393,
+and the only diffs were `Game.cpp` +4/+10, `ResourceLoader.cpp`
++1/+4, `TextLoader.cpp` +3; `classes.h` identical). `ModLoader`
+is declared in `modloader.h`, which `platform.h` includes, so it
+is visible to all generated code; `LIB_CLASSES`/`LIB_METHODS` in
+the translator list the five `ModLoader` calls.
 
 Open audit: the other `int8_t` locals in the generated code were eyeballed
 after patch 1 and none is a pixel coordinate that can exceed 127, but no

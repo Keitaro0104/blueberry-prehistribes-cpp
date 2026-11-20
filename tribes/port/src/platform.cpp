@@ -26,6 +26,7 @@ namespace fs = std::filesystem;
 std::string Platform::dataDir;
 std::string Platform::saveDir;
 std::string Platform::userDir;
+std::string Platform::modsDir;
 
 std::string Platform::exeDir() {
 #ifdef _WIN32

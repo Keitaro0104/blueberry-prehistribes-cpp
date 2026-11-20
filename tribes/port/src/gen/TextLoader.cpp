@@ -136,6 +136,9 @@ void TextLoader::loadTextFile(int var1) {
          }
          this->inputStream->close();
          (this->inputStream = nullptr);
+         if ((var1 == 0)) {
+            ModLoader::reapplyMapNames(this->game);
+         }
       } catch (JavaException& var3) {
          return;
       }

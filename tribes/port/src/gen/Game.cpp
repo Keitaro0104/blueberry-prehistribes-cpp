@@ -1087,6 +1087,10 @@ void Game::c_byte_void(int8_t var1) {
          var8->read(var7, 0, var6);
          if ((var10 == var1)) {
             (this->spritePacks[2][0] = Image::createImage(var7, 0, var6));
+            Image* modImage = ModLoader::spriteOverride(this, 2, var1, this->spritePacks[2][0]);
+            if ((modImage != nullptr)) {
+               (this->spritePacks[2][0] = modImage);
+            }
             break;
          }
       }
@@ -3609,13 +3613,17 @@ void Game::loadMap() {
       int var7 = 10;
       for (int var3 = 0; (var3 < this->tableMapHeight); var3++) {
          for (int var2 = 0; (var2 < this->tableMapWidth); var2++) {
-            if ((var7 >= this->fileAData[((this->recordStarts[197] + 0) + var8)])) {
-               (var1 = (int16_t)((this->mapData[(this->mapChunkOffsets[this->fileAData[(this->recordStarts[248] + this->missionIndex)]] + var5)] & 0xFF)));
-               var5++;
-               if ((var1 >= 250)) {
-                  (var7 = 0);
-                  (var8 = (var1 - 250));
-                  (var1 = (this->fileAData[((this->recordStarts[197] + 6) + var8)] & 255));
+            if (ModLoader::hasModMap(this->missionIndex)) {
+               (var1 = ModLoader::modMapTile(this->missionIndex, var3, var2));
+            } else {
+               if ((var7 >= this->fileAData[((this->recordStarts[197] + 0) + var8)])) {
+                  (var1 = (int16_t)((this->mapData[(this->mapChunkOffsets[this->fileAData[(this->recordStarts[248] + this->missionIndex)]] + var5)] & 0xFF)));
+                  var5++;
+                  if ((var1 >= 250)) {
+                     (var7 = 0);
+                     (var8 = (var1 - 250));
+                     (var1 = (this->fileAData[((this->recordStarts[197] + 6) + var8)] & 255));
+                  }
                }
             }
             var7++;

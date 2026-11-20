@@ -38,6 +38,7 @@
 #include "engine.h"
 #include "gen/classes.h"
 #include "input.h"
+#include "modloader.h"
 #include "platform.h"
 
 namespace {
@@ -102,6 +103,7 @@ void printUsage() {
        "                 [--bench <seconds>] [--trace]\n"
        "  --data <dir>    unpacked game data (default: <exe>\\data)\n"
        "  --saves <dir>   save folder (default: <exe>\\saves)\n"
+       "  --mods <dir>    mod folder (default: <exe>\\mods)\n"
        "  --windowed      windowed mode (default)\n"
        "  --fullscreen    fullscreen (letterboxed)\n"
        "  --scale N       window scale, default 3 (720x960)\n"
@@ -115,6 +117,7 @@ void printUsage() {
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR cmdLine, int) {
    std::string dataDir;
    std::string saveDir;
+   std::string modsDir;
    std::string dumpPath;
    double dumpSeconds = 8.0;
    double benchSeconds = 0.0;
@@ -141,6 +144,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR cmdLine, int) {
             i++;
          } else if (a == "--saves" && i + 1 < argc) {
             saveDir = next();
+            i++;
+         } else if (a == "--mods" && i + 1 < argc) {
+            modsDir = next();
             i++;
          } else if (a == "--windowed") {
             fullscreen = false;
@@ -190,13 +196,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR cmdLine, int) {
    std::string exeDir = Platform::exeDir();
    if (dataDir.empty()) dataDir = exeDir + "\\data";
    if (saveDir.empty()) saveDir = exeDir + "\\saves";
+   if (modsDir.empty()) modsDir = exeDir + "\\mods";
    Platform::dataDir = dataDir;
    Platform::saveDir = saveDir;
    Platform::userDir = exeDir;
+   Platform::modsDir = modsDir;
 
    // Start the session log first: from here on, every stage is recorded
    // in <exe>\tribes-log.txt, even if the game crashes later.
    crashlog::init(exeDir);
+   // Discover mods before the game starts (a missing mods folder is
+   // fine — the loader is a no-op and the game runs exactly as before).
+   ModLoader::init(modsDir);
    trace("exe dir: %s\n", exeDir.c_str());
    trace("data dir: %s\n", dataDir.c_str());
    trace("save dir: %s\n", saveDir.c_str());

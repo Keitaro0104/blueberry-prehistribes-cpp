@@ -30,6 +30,7 @@
 #include "engine.h"
 #include "gen/classes.h"
 #include "gfx.h"
+#include "modloader.h"
 #include "platform.h"
 
 namespace {
@@ -69,6 +70,7 @@ void reportState() {
 int main(int argc, char** argv) {
    std::string dataDir;
    std::string saveDir = "/tmp/tribes-saves";
+   std::string modsDir;
    std::string dumpPath;
    double seconds = 12.0;
    bool play = false;
@@ -83,6 +85,9 @@ int main(int argc, char** argv) {
          i++;
       } else if (a == "--saves" && i + 1 < argc) {
          saveDir = next();
+         i++;
+      } else if (a == "--mods" && i + 1 < argc) {
+         modsDir = next();
          i++;
       } else if (a == "--seconds" && i + 1 < argc) {
          seconds = std::stod(next());
@@ -107,11 +112,17 @@ int main(int argc, char** argv) {
    Platform::dataDir = dataDir;
    Platform::saveDir = saveDir;
    Platform::userDir = saveDir;
+   // Default mods dir is the sibling of the data dir (like <exe>\mods
+   // next to <exe>\data on Windows).
+   if (modsDir.empty()) modsDir = dataDir + "/../mods";
+   Platform::modsDir = modsDir;
 
    // Exercise the session logger too (log lands in the saves dir).
    crashlog::init(saveDir);
    crashlog::log("linux_smoke: data=%s saves=%s seconds=%.0f",
                  dataDir.c_str(), saveDir.c_str(), seconds);
+   // Discover mods before the game starts (no mods folder = no-op).
+   ModLoader::init(modsDir);
 
    Canvas::setRepaintCallback(presentFrame);
 

@@ -95,6 +95,11 @@ OVERRIDES = {
 # translator fails loudly -- a stale patch can never silently disappear,
 # and the generated code stays reproducible from tribes/src/ plus this
 # list. Never edit tribes/src/ or tribes/port/src/gen/ by hand.
+#
+# Patches 2-6 are a second kind: mod-loader hooks (design
+# tribes/docs/MOD-LOADER-DESIGN.md). They are not decompiler-error
+# corrections -- they wire the hand-written ModLoader into the generated
+# code at the four engine seams. The same exactly-once rule applies.
 # ---------------------------------------------------------------------------
 SOURCE_PATCHES = [
     # 1. Game.renderWorldEntities: the screen-row pixel Y must be int.
@@ -109,6 +114,42 @@ SOURCE_PATCHES = [
     ("Game.java",
      "   private void renderWorldEntities() {\n      int var1 = 0;\n      byte var2 = -16;",
      "   private void renderWorldEntities() {\n      int var1 = 0;\n      int var2 = -16;"),
+    # 2. ResourceLoader ctor: apply the mod overrides once, after every
+    #    base table is loaded (loadMaps is last). ModLoader.applyMods
+    #    patches /a rec 149/279/150 + the setup table and the map name;
+    #    it is a no-op when no map mods are enabled.
+    ("ResourceLoader.java",
+     "      this.loadMusic();\n      this.loadMaps();\n   }",
+     "      this.loadMusic();\n      this.loadMaps();\n      ModLoader.applyMods(this.game);\n   }"),
+    # 3. ResourceLoader.loadSpritePack: after the base sprite image is
+    #    decoded, ask the mod loader for a same-size replacement
+    #    (sprites/pi0|pi9-<index>.png). The hook decodes the PNG and
+    #    checks dimensions; a mismatch keeps the base image.
+    ("ResourceLoader.java",
+     "               if (var3 < 27) {\n                  this.game.spritePacks[this.currentPackIndex][var3] = Image.createImage(var7, var8, var5);\n               }",
+     "               if (var3 < 27) {\n                  this.game.spritePacks[this.currentPackIndex][var3] = Image.createImage(var7, var8, var5);\n                  Image modImage = ModLoader.spriteOverride(this.game, this.currentPackIndex, var3, this.game.spritePacks[this.currentPackIndex][var3]);\n                  if (modImage != null) {\n                     this.game.spritePacks[this.currentPackIndex][var3] = modImage;\n                  }\n               }"),
+    # 4. Game.c_byte_void (lazy pi8 load): same override hook for the
+    #    story/cutscene pack. The requested image is stored at
+    #    spritePacks[2][0], so the override key is (pack 2, var1).
+    ("Game.java",
+     "            if (var10 == var1) {\n               this.spritePacks[2][0] = Image.createImage(var7, 0, var6);\n               break;\n            }",
+     "            if (var10 == var1) {\n               this.spritePacks[2][0] = Image.createImage(var7, 0, var6);\n               Image modImage = ModLoader.spriteOverride(this, 2, var1, this.spritePacks[2][0]);\n               if (modImage != null) {\n                  this.spritePacks[2][0] = modImage;\n               }\n               break;\n            }"),
+    # 5. Game.loadMap: tile-source branch (Seam 3). When a mod replaces
+    #    level q, the base tile comes from the mod JSON instead of the
+    #    /ma RLE stream; the rest of the loop body (jitter for tiles
+    #    <= 8, markers, spawn registration, borders) is unchanged.
+    #    /ma and rec 248 are never touched: rec 248 also feeds the
+    #    map-name index (s[82+piece]) and the progress markers.
+    ("Game.java",
+     "               if (var7 >= this.fileAData[this.recordStarts[197] + 0 + var8]) {",
+     "               if (ModLoader.hasModMap(this.missionIndex)) {\n                  var1 = ModLoader.modMapTile(this.missionIndex, var3, var2);\n               } else if (var7 >= this.fileAData[this.recordStarts[197] + 0 + var8]) {"),
+    # 6. TextLoader.loadTextFile: after the s file (var1 == 0) is read,
+    #    re-apply the mod map-name patches. Picking a language reloads
+    #    the s file from the base data, which would otherwise wipe the
+    #    names applyMods patched in. No-op when no map mods are enabled.
+    ("TextLoader.java",
+     "            this.inputStream.close();\n            this.inputStream = null;\n         } catch (IOException var3) {",
+     "            this.inputStream.close();\n            this.inputStream = null;\n            if (var1 == 0) {\n               ModLoader.reapplyMapNames(this.game);\n            }\n         } catch (IOException var3) {"),
 ]
 
 
@@ -314,6 +355,7 @@ LIB_CLASSES = {
     "Font": "Font",
     "Manager": "Manager",
     "JavaClass": "JavaClass",
+    "ModLoader": "ModLoader",
 }
 
 # Library methods: (class, name) -> (return type descriptor, is_static).
@@ -423,6 +465,13 @@ LIB_METHODS = {
     ("VolumeControl", "getLevel"): (("prim", "int"), False),
     ("Manager", "createPlayer"): (("cls", "Player"), True),
     ("JavaClass", "getResourceAsStream"): (("cls", "InputStream"), False),
+    # ModLoader (hand-written, tribes/port/src/modloader.h): the mod
+    # hooks called from the counted SOURCE_PATCHES below.
+    ("ModLoader", "applyMods"): (("prim", "void"), True),
+    ("ModLoader", "spriteOverride"): (("cls", "Image"), True),
+    ("ModLoader", "hasModMap"): (("prim", "bool"), True),
+    ("ModLoader", "modMapTile"): (("prim", "int"), True),
+    ("ModLoader", "reapplyMapNames"): (("prim", "void"), True),
     ("Runnable", "run"): (("prim", "void"), False),
     ("Object", "getClass"): (("cls", "JavaClass"), False),
     ("Object", "toString"): (("str",), False),

@@ -19,6 +19,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PORT="$ROOT/tribes/port"
 BUILD_DIR="${BUILD_DIR:-/tmp/tribes-build}"
 DATA_DIR="${DATA_DIR:-$HOME/workspace/j2me-prehistoric-tribes/extracted}"
+MODS_DIR="${MODS_DIR:-}"
 SAVES_DIR="$BUILD_DIR/saves"
 BMP="$BUILD_DIR/smoke.bmp"
 
@@ -30,6 +31,7 @@ while [ $# -gt 0 ]; do
     --play) PLAY="--play"; shift ;;
     --seconds) SECONDS_ARG="$2"; shift 2 ;;
     --trace) TRACE="--trace"; shift ;;
+    --mods) MODS_DIR="$2"; shift 2 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -41,7 +43,8 @@ echo "== compiling the portable core + smoke driver =="
 g++ -std=c++17 -O1 -Wall -Wno-unused-parameter \
   -I"$PORT/src" -I"$PORT/third_party/stb" \
   "$PORT/src/jrt.cpp" "$PORT/src/gfx.cpp" "$PORT/src/engine.cpp" \
-  "$PORT/src/platform.cpp" "$PORT/src/crashlog.cpp" "$PORT/src/gen/Game.cpp" \
+  "$PORT/src/platform.cpp" "$PORT/src/crashlog.cpp" "$PORT/src/modloader.cpp" \
+  "$PORT/src/gen/Game.cpp" \
   "$PORT/src/gen/World.cpp" "$PORT/src/gen/MidiPlayer.cpp" \
   "$PORT/src/gen/TextLoader.cpp" "$PORT/src/gen/ResourceLoader.cpp" \
   "$PORT/src/gen/Splash.cpp" "$PORT/src/gen/TribesMIDlet.cpp" \
@@ -50,8 +53,10 @@ g++ -std=c++17 -O1 -Wall -Wno-unused-parameter \
   -o "$BUILD_DIR/linux_smoke" -lpthread
 
 echo "== running the smoke test (${SECONDS_ARG}s) =="
+MODS_ARG=""
+if [ -n "$MODS_DIR" ]; then MODS_ARG="--mods $MODS_DIR"; fi
 "$BUILD_DIR/linux_smoke" --data "$DATA_DIR" --saves "$SAVES_DIR" \
-  --seconds "$SECONDS_ARG" --dump "$BMP" $PLAY $TRACE
+  --seconds "$SECONDS_ARG" --dump "$BMP" $PLAY $TRACE $MODS_ARG
 
 echo "== checking the dumped frame =="
 python3 - "$BMP" <<'EOF'

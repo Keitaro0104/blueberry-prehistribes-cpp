@@ -31,6 +31,7 @@ add_executable(tribes WIN32
    src/engine.cpp
    src/platform.cpp
    src/crashlog.cpp
+   src/modloader.cpp
    src/display.cpp
    src/input.cpp
    src/main.cpp

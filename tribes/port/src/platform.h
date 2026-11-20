@@ -13,6 +13,7 @@
 
 #include "engine.h"
 #include "jrt.h"
+#include "modloader.h"
 
 using namespace jrt;
 
@@ -20,6 +21,7 @@ struct Platform {
    static std::string dataDir;   // unpacked game data (the user's JAR)
    static std::string saveDir;   // saves + settings (RecordStores)
    static std::string userDir;   // per-user folder (saves, logs, config)
+   static std::string modsDir;   // no-repack mods (phase 1: textures+maps)
    static std::string exeDir();  // directory of the running executable
 };
 

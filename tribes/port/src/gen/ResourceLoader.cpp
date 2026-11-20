@@ -17,6 +17,7 @@ ResourceLoader::ResourceLoader(Game* var1) {
    this->initTextLoader();
    this->loadMusic();
    this->loadMaps();
+   ModLoader::applyMods(this->game);
 }
 
 void ResourceLoader::allocateBalanceTables() {
@@ -227,6 +228,10 @@ void ResourceLoader::loadSpritePack() {
          try {
             if ((var3 < 27)) {
                (this->game->spritePacks[this->currentPackIndex][var3] = Image::createImage(var7, var8, var5));
+               Image* modImage = ModLoader::spriteOverride(this->game, this->currentPackIndex, var3, this->game->spritePacks[this->currentPackIndex][var3]);
+               if ((modImage != nullptr)) {
+                  (this->game->spritePacks[this->currentPackIndex][var3] = modImage);
+               }
             }
          } catch (JavaException& var10) {
          }
