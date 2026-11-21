@@ -8,10 +8,13 @@
 # splash played, the menu rendered, and the loop ran without crashing.
 #
 # Usage: tools/run_linux_smoke.sh [--play] [--seconds N] [--trace]
+#          [--aspect <original|4:3|16:9>] [--fps <30|60|auto>]
 #   --play       send a scripted FIRE key to the menu (start a new game)
 #   --no-interp  disable render interpolation (old 1-render-per-tick)
 #   --seconds N  run duration (default 12)
 #   --trace      per-second state output
+#   --aspect ... logical view width (original 240, 4:3 427, 16:9 569)
+#   --fps ...    render target fps (30 / 60 / auto; auto = 60 headless)
 # The final frame is written to /tmp/tribes-build/smoke.bmp; the script
 # checks it is non-blank (more than 3 distinct sampled colours).
 
@@ -28,12 +31,16 @@ PLAY=""
 SECONDS_ARG="12"
 TRACE=""
 NOINTERP=""
+ASPECT="original"
+FPS="60"
 while [ $# -gt 0 ]; do
   case "$1" in
     --play) PLAY="--play"; shift ;;
     --seconds) SECONDS_ARG="$2"; shift 2 ;;
     --trace) TRACE="--trace"; shift ;;
     --no-interp) NOINTERP="--no-interp"; shift ;;
+    --aspect) ASPECT="$2"; shift 2 ;;
+    --fps) FPS="$2"; shift 2 ;;
     --mods) MODS_DIR="$2"; shift 2 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -59,7 +66,8 @@ echo "== running the smoke test (${SECONDS_ARG}s) =="
 MODS_ARG=""
 if [ -n "$MODS_DIR" ]; then MODS_ARG="--mods $MODS_DIR"; fi
 "$BUILD_DIR/linux_smoke" --data "$DATA_DIR" --saves "$SAVES_DIR" \
-  --seconds "$SECONDS_ARG" --dump "$BMP" $PLAY $TRACE $NOINTERP $MODS_ARG
+  --seconds "$SECONDS_ARG" --dump "$BMP" $PLAY $TRACE $NOINTERP $MODS_ARG \
+  --aspect "$ASPECT" --fps "$FPS"
 
 echo "== checking the dumped frame =="
 python3 - "$BMP" <<'EOF'

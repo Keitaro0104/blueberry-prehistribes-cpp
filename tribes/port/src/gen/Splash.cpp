@@ -21,7 +21,7 @@ void Splash::paint(Surface* var1) {
 void Splash::showSplash() {
    if (!this->bufferCreated) {
       (this->bufferCreated = true);
-      (Game::screenBuffers[0] = Image::createImage(264, 352));
+      (Game::screenBuffers[0] = Image::createImage(((((Game::viewWidthPx + 21) / 22) + 1) * 22), 352));
       (Game::screenBufferGraphics[0] = Game::screenBuffers[0]->getGraphics());
    }
    try {

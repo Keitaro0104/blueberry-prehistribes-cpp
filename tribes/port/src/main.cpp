@@ -25,6 +25,7 @@
 
 #include <shellapi.h>  // CommandLineToArgvW
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdarg>
@@ -106,7 +107,18 @@ void printUsage() {
        "  --mods <dir>    mod folder (default: <exe>\\mods)\n"
        "  --windowed      windowed mode (default)\n"
        "  --fullscreen    fullscreen (letterboxed)\n"
-       "  --scale N       window scale, default 3 (720x960)\n"
+       "       "  --scale N       window scale, default 3 (720x960; original aspect\\n"
+       "                  only, ignored with --aspect)\\n"
+       "  --aspect <original|4:3|16:9>\\n"
+       "                  logical view: 240x320 (default), 427x320, 569x320;\\n"
+       "                  the world view widens (more tile columns), height\\n"
+       "                  stays 320; menus stay 240 wide and are centred;\\n"
+       "                  window opens at 1024x768 (4:3) or 1280x720 (16:9),\\n"
+       "                  or the largest fitting whole-multiple scale\\n"
+       "  --fps <30|60|auto>\\n"
+       "                  render target fps (default 60, ~17 ms per render);\\n"
+       "                  auto follows the display refresh rate;\\n"
+       "                  --no-interp overrides --fps\\n"\n"
        "  --dump <bmp>    headless: write the final frame to <bmp>\n"
        "  --bench <secs>  headless: run N seconds, report frames presented\n"
        "  --trace         verbose progress output\n"
@@ -126,6 +138,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR cmdLine, int) {
    bool fullscreen = false;
    int scale = 3;
    bool noInterp = false;
+   std::string aspect = "original";
+   std::string fps = "60";
 
    // Minimal argument parsing (no external dependency).
    {
@@ -176,6 +190,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR cmdLine, int) {
             g_trace = true;
          } else if (a == "--no-interp") {
             noInterp = true;
+         } else if (a == "--aspect" && i + 1 < argc) {
+            aspect = next();
+            i++;
+         } else if (a == "--fps" && i + 1 < argc) {
+            fps = next();
+            i++;
          } else if (a == "--help" || a == "-h") {
             printUsage();
             return 0;
@@ -213,11 +233,91 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR cmdLine, int) {
    // Discover mods before the game starts (a missing mods folder is
    // fine — the loader is a no-op and the game runs exactly as before).
    ModLoader::init(modsDir);
+
+   // --- Aspect: logical view width (height is always 320) ---------------
+   // original 240x320, 4:3 427x320, 16:9 569x320. The world view widens
+   // (more tile columns); menus stay 240 wide and are centred (patch 29).
+   // The window opens at 1024x768 (4:3) or 1280x720 (16:9), or the largest
+   // whole-multiple scale of the logical size that fits the desktop.
+   int viewW = 240;
+   int targetClientW = 0, targetClientH = 0;
+   if (aspect == "4:3") {
+      viewW = 427;
+      targetClientW = 1024;
+      targetClientH = 768;
+   } else if (aspect == "16:9") {
+      viewW = 569;
+      targetClientW = 1280;
+      targetClientH = 720;
+   } else if (aspect != "original") {
+      crashlog::log("WARNING: unknown --aspect '%s', falling back to "
+                    "original (240x320)",
+                    aspect.c_str());
+      std::fprintf(stderr,
+                   "WARNING: unknown --aspect '%s', falling back to "
+                   "original (240x320)\n",
+                   aspect.c_str());
+   }
+   if (targetClientW > 0) {
+      RECT work;
+      if (SystemParametersInfo(SPI_GETWORKAREA, 0, &work, 0)) {
+         int workW = work.right - work.left;
+         int workH = work.bottom - work.top;
+         int s = std::max(1, std::min(workW / viewW, workH / 320));
+         if (viewW * s < targetClientW || 320 * s < targetClientH) {
+            targetClientW = viewW * s;
+            targetClientH = 320 * s;
+         }
+      }
+      if (scale != 3) {
+         crashlog::log("NOTE: --scale %d ignored with --aspect %s (window "
+                       "is sized for the aspect)",
+                       scale, aspect.c_str());
+      }
+   }
+   Game::viewWidthPx = viewW;
+   g_screen.resize(viewW, 320);
+
+   // --- FPS: render pacing for the interpolation renders ----------------
+   // 60 -> ~17 ms per render (current behaviour), 30 -> ~33 ms, auto ->
+   // the display refresh rate (EnumDisplaySettings). --no-interp keeps its
+   // existing meaning (1 render per tick) and overrides --fps.
+   int renderIntervalMs = 17;
+   if (fps == "30") {
+      renderIntervalMs = 33;
+   } else if (fps == "auto") {
+      DEVMODE dm{};
+      dm.dmSize = sizeof(dm);
+      int freq = 0;
+      if (EnumDisplaySettings(nullptr, ENUM_CURRENT_SETTINGS, &dm) &&
+          (dm.dmFields & DM_DISPLAYFREQUENCY) &&
+          dm.dmDisplayFrequency >= 30 && dm.dmDisplayFrequency <= 240) {
+         freq = dm.dmDisplayFrequency;
+      }
+      renderIntervalMs = (freq > 0)
+                             ? std::max(7, std::min(33, (int)(1000.0 / freq + 0.5)))
+                             : 17;
+   } else if (fps != "60") {
+      crashlog::log("WARNING: unknown --fps '%s', falling back to 60",
+                    fps.c_str());
+      std::fprintf(stderr, "WARNING: unknown --fps '%s', falling back to 60\n",
+                   fps.c_str());
+   }
+   if (noInterp) {
+      crashlog::log("NOTE: --no-interp overrides --fps %s (1 render per "
+                    "tick, ~8.3/s)",
+                    fps.c_str());
+   }
+   Game::interpRenderIntervalMs = renderIntervalMs;
    if (noInterp) {
       Game::interpEnabled = false;
    }
-   trace("render interpolation: %s\n",
-         noInterp ? "OFF (--no-interp)" : "ON");
+   trace("aspect: %s (logical %dx%d, window %dx%d)\n", aspect.c_str(), viewW,
+         320, targetClientW > 0 ? targetClientW : 240 * scale,
+         targetClientH > 0 ? targetClientH : 320 * scale);
+   trace("render interpolation: %s (fps target: %s, render interval: %d ms)\n",
+         noInterp ? "OFF (--no-interp)" : "ON", fps.c_str(),
+         renderIntervalMs);
    trace("exe dir: %s\n", exeDir.c_str());
    trace("data dir: %s\n", dataDir.c_str());
    trace("save dir: %s\n", saveDir.c_str());
@@ -231,7 +331,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR cmdLine, int) {
       return 1;
    }
 
-   WinDisplay display(scale, fullscreen);
+   WinDisplay display(scale, fullscreen, viewW, 320);
+   if (targetClientW > 0) {
+      display.setTargetClientSize(targetClientW, targetClientH);
+   }
    if (!headless) {
       if (!display.create("Prehistoric Tribes")) {
          std::fprintf(stderr, "failed to create the window\n");
@@ -241,8 +344,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR cmdLine, int) {
       }
       g_winDisplay = &display;
       display.setScreen(&g_screen);
-      trace("window created (scale=%d, fullscreen=%d)\n", scale,
-            fullscreen ? 1 : 0);
+      trace("window created (scale=%d, fullscreen=%d, logical %dx%d, client "
+            "%dx%d)\n",
+            scale, fullscreen ? 1 : 0, viewW, 320,
+            targetClientW > 0 ? targetClientW : viewW * scale,
+            targetClientH > 0 ? targetClientH : 320 * scale);
    }
 
    Canvas::setRepaintCallback(presentFrame);

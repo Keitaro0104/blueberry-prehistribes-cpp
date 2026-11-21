@@ -212,6 +212,8 @@ class Game : public Canvas, public Runnable {
   void updateEffects();
   inline static int softkeyLeftCode = -6;
   inline static bool interpEnabled = true;
+  inline static int interpRenderIntervalMs = 17;
+  inline static int viewWidthPx = 240;
   inline static int softkeyRightCode = -7;
   bool cheatsEnabled = true;
   TribesMIDlet* midlet{};

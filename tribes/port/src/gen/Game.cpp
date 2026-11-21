@@ -4432,7 +4432,7 @@ void Game::paint(Surface* var1) {
       } else {
          (var2 = 3);
       }
-      drawRegionSafe(var1, screenBuffers[var2], 0, 0, 262, this->viewHeightPx, ((this->screenBaseX - 11) + this->scrollXPx), (((((this->screenBaseY - 8) + this->bufferCopyY) - this->visiblePanelCount) + this->scrollYPx) + 0), 0);
+      drawRegionSafe(var1, screenBuffers[var2], 0, 0, (((this->screenColsTiles + 1) * 22) - 2), this->viewHeightPx, ((this->screenBaseX - 11) + this->scrollXPx), (((((this->screenBaseY - 8) + this->bufferCopyY) - this->visiblePanelCount) + this->scrollYPx) + 0), 0);
       for (int8_t var3 = 0; (var3 < 20); var3++) {
          if (this->hudPanelVisible[var3]) {
             drawRegionSafe(var1, screenBuffers[this->screenBufferIndex[this->fileAData[((this->recordStarts[195] + 0) + var3)]]], 0, this->screenContentHeights[this->fileAData[((this->recordStarts[195] + 0) + var3)]], (this->screenWidths[this->fileAData[((this->recordStarts[195] + 0) + var3)]] + 11), this->screenHeights[this->fileAData[((this->recordStarts[195] + 0) + var3)]], (this->screenBaseX - 11), ((this->screenBaseY + this->screenPanelY[this->fileAData[((this->recordStarts[195] + 0) + var3)]]) + 0), 0);
@@ -4449,11 +4449,13 @@ void Game::paint(Surface* var1) {
          }
       }
    } else {
-      drawRegionSafe(var1, screenBuffers[menuBufferIdx], 0, 0, 251, 328, (this->screenBaseX - 11), ((this->screenBaseY - 8) + 0), 0);
+      var1->setColor(0);
+      fillRect(var1, -11, -8, viewWidthPx, 320);
+      drawRegionSafe(var1, screenBuffers[menuBufferIdx], 0, 0, 251, 328, ((this->screenBaseX - 11) + ((viewWidthPx - 240) / 2)), ((this->screenBaseY - 8) + 0), 0);
       if (((this->storyMode && !this->storyIsCutscene) && (this->storyImageId < 0))) {
          var1->setColor(0);
-         fillRect(var1, (this->screenBaseX - 11), ((this->screenBaseY - 8) + 0), 240, (16 + -this->storyImageId));
-         fillRect(var1, (this->screenBaseX - 11), (((((this->screenBaseY - 8) + 16) + 320) - -this->storyImageId) + 0), 240, -this->storyImageId);
+         fillRect(var1, ((this->screenBaseX - 11) + ((viewWidthPx - 240) / 2)), ((this->screenBaseY - 8) + 0), 240, (16 + -this->storyImageId));
+         fillRect(var1, ((this->screenBaseX - 11) + ((viewWidthPx - 240) / 2)), (((((this->screenBaseY - 8) + 16) + 320) - -this->storyImageId) + 0), 240, -this->storyImageId);
       }
    }
    (this->repaintPending = false);
@@ -5505,7 +5507,7 @@ void Game::run() {
          }
          this->interpCapture();
          if ((interpEnabled && (this->mode == 1))) {
-            int maxRenders = ((this->tickLengthMs / 17) + 1);
+            int maxRenders = ((this->tickLengthMs / interpRenderIntervalMs) + 1);
             int renderSteps = 0;
             int64_t nextRender = tickStart;
             while (true) {
@@ -5533,7 +5535,7 @@ void Game::run() {
                }
                this->interpRestore();
                renderSteps++;
-               (nextRender += 17);
+               (nextRender += interpRenderIntervalMs);
             }
             int64_t var5 = (nowMillis() - tickStart);
             if ((((var5 = (this->tickLengthMs - var5)) < 0LL) || (var5 > this->tickLengthMs))) {
@@ -5816,7 +5818,7 @@ void Game::scrollRedrawTerrain() {
                (this->redrawRowStart = (-this->scrollDirY * 16));
             }
          }
-         drawRegionSafe(screenBufferGraphics[this->screenBufferIndex[1]], screenBuffers[this->screenBufferIndex[0]], 0, 0, 264, this->viewHeightPx, this->redrawColStart, this->redrawRowStart, 0);
+         drawRegionSafe(screenBufferGraphics[this->screenBufferIndex[1]], screenBuffers[this->screenBufferIndex[0]], 0, 0, ((this->screenColsTiles + 1) * 22), this->viewHeightPx, this->redrawColStart, this->redrawRowStart, 0);
          if ((this->scrollDirX != 0)) {
             (this->redrawColStart = ((((this->scrollDirX - 2) / 2) + 1) * (this->screenColsTiles - 1)));
             (this->redrawColEnd = this->redrawColStart);
@@ -5853,7 +5855,7 @@ void Game::scrollRedrawTerrain() {
          }
       }
       if (((this->redrawRowEnd != -1) && !this->storyMode)) {
-         drawRegionSafe(screenBufferGraphics[this->screenBufferIndex[0]], screenBuffers[this->screenBufferIndex[1]], 0, 0, 264, this->viewHeightPx, 0, 0, 0);
+         drawRegionSafe(screenBufferGraphics[this->screenBufferIndex[0]], screenBuffers[this->screenBufferIndex[1]], 0, 0, ((this->screenColsTiles + 1) * 22), this->viewHeightPx, 0, 0, 0);
       }
    } catch (JavaException& var2) {
    }

@@ -11,9 +11,14 @@
 // Usage:
 //   linux_smoke --data <extracted-jar-dir> --saves <dir>
 //               [--seconds N] [--dump <bmp>] [--trace] [--play]
+//               [--aspect <original|4:3|16:9>] [--fps <30|60|auto>]
 //   --seconds N   how long to run (default 12: splash is 1+2+2 s, then
 //                 the title screen; 12 s leaves ~7 s on the menu)
-//   --dump <bmp>  write the final 240x320 frame to a BMP
+//   --dump <bmp>  write the final frame to a BMP (240/427/569 x 320)
+//   --aspect ...  logical view width: original 240, 4:3 427, 16:9 569
+//                 (height always 320)
+//   --fps ...     render target fps: 30 / 60 (default) / auto (= 60 here:
+//                 headless, no display refresh rate to follow)
 //   --play        after the title shows, send a scripted key sequence
 //                 (FIRE to start a new game, then wait) to exercise the
 //                 game beyond the menu; dumps the frame after the keys.
@@ -76,6 +81,8 @@ int main(int argc, char** argv) {
    double seconds = 12.0;
    bool play = false;
    bool noInterp = false;
+   std::string aspect = "original";
+   std::string fps = "60";
 
    for (int i = 1; i < argc; i++) {
       std::string a = argv[i];
@@ -101,6 +108,12 @@ int main(int argc, char** argv) {
          play = true;
       } else if (a == "--no-interp") {
          noInterp = true;
+      } else if (a == "--aspect" && i + 1 < argc) {
+         aspect = next();
+         i++;
+      } else if (a == "--fps" && i + 1 < argc) {
+         fps = next();
+         i++;
       } else if (a == "--trace") {
          g_trace = true;
       } else {
@@ -127,11 +140,49 @@ int main(int argc, char** argv) {
                  dataDir.c_str(), saveDir.c_str(), seconds);
    // Discover mods before the game starts (no mods folder = no-op).
    ModLoader::init(modsDir);
+
+   // --- Aspect + FPS (same flags as the Windows shell) ------------------
+   // Headless: --fps auto behaves as 60 (no display refresh rate to
+   // follow). Invalid values warn and fall back.
+   int viewW = 240;
+   if (aspect == "4:3") {
+      viewW = 427;
+   } else if (aspect == "16:9") {
+      viewW = 569;
+   } else if (aspect != "original") {
+      std::fprintf(stderr,
+                   "WARNING: unknown --aspect '%s', falling back to "
+                   "original (240x320)\n",
+                   aspect.c_str());
+   }
+   const char* aspectName =
+       (viewW == 427) ? "4:3" : (viewW == 569) ? "16:9" : "original";
+   Game::viewWidthPx = viewW;
+   g_screen.resize(viewW, 320);
+
+   int renderIntervalMs = 17;
+   if (fps == "30") {
+      renderIntervalMs = 33;
+   } else if (fps == "auto") {
+      renderIntervalMs = 17;  // headless: no display refresh rate to follow
+   } else if (fps != "60") {
+      std::fprintf(stderr, "WARNING: unknown --fps '%s', falling back to 60\n",
+                   fps.c_str());
+   }
+   if (noInterp) {
+      std::fprintf(stderr,
+                   "NOTE: --no-interp overrides --fps %s (1 render per "
+                   "tick, ~8.3/s)\n",
+                   fps.c_str());
+   }
+   Game::interpRenderIntervalMs = renderIntervalMs;
    if (noInterp) {
       Game::interpEnabled = false;
    }
-   std::printf("linux_smoke: render interpolation %s\n",
-               Game::interpEnabled ? "ON" : "OFF (--no-interp)");
+   std::printf("linux_smoke: render interpolation %s (fps %s, interval "
+               "%d ms), aspect %s (%dx%d)\n",
+               Game::interpEnabled ? "ON" : "OFF (--no-interp)", fps.c_str(),
+               renderIntervalMs, aspectName, viewW, 320);
 
    Canvas::setRepaintCallback(presentFrame);
 

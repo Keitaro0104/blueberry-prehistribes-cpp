@@ -44,7 +44,7 @@ void ResourceLoader::initScreenBuffers() {
       jlang::gc();
       Thread::yield();
       (this->game->viewHeightPx = 288);
-      (this->game->screenColsTiles = 11);
+      (this->game->screenColsTiles = (int8_t)(((Game::viewWidthPx + 21) / 22)));
       (this->game->screenRowsTiles = (int8_t)((((this->game->viewHeightPx - 1) / 16) + 1)));
       bool var1 = false;
       (this->game->cursorCol = (int8_t)((this->game->screenColsTiles >> 1)));
@@ -52,14 +52,15 @@ void ResourceLoader::initScreenBuffers() {
       (this->game->homeCursorCol = this->game->cursorCol);
       (this->game->homeCursorRow = this->game->cursorRow);
       (this->game->screenWidths = newArr<int>({(int)(264), (int)(264), (int)(240), (int)(240), (int)(240), (int)(240), (int)(68), (int)(240), (int)(68), (int)(63), (int)(240), (int)(240), (int)(240)}));
+      (this->game->screenWidths[1] = ((this->game->screenColsTiles + 1) * 22));
       (this->game->screenHeights = newArr<int>({(int)(352), (int)(304), (int)(22), (int)(48), (int)(22), (int)(48), (int)(55), (int)(86), (int)(49), (int)(55), (int)(38), (int)(0), (int)(0)}));
       (this->game->screenContentHeights = newArr<int>({(int)(0), (int)(0), (int)(304), (int)(304), (int)(326), (int)(326), (int)(0), (int)(326), (int)(0), (int)(0), (int)(326), (int)(0), (int)(0)}));
       (this->game->screenPanelY = newArr<int>({(int)(0), (int)(16), (int)(0), (int)(0), (int)(298), (int)(272), (int)(0), (int)(234), (int)(0), (int)(0), (int)(282), (int)(320), (int)(0)}));
       (this->game->screenBufferIndex = newArr<int8_t>({(int8_t)(0), (int8_t)(1), (int8_t)(0), (int8_t)(0), (int8_t)(0), (int8_t)(0), (int8_t)(2), (int8_t)(0), (int8_t)(2), (int8_t)(2), (int8_t)(0), (int8_t)(0), (int8_t)(0)}));
       (this->game->hudPanelForScreen = newArr<int8_t>({(int8_t)(0), (int8_t)(0), (int8_t)(6), (int8_t)(0), (int8_t)(0), (int8_t)(0), (int8_t)(0), (int8_t)(0), (int8_t)(0), (int8_t)(0), (int8_t)(0), (int8_t)(0), (int8_t)(0)}));
-      (Game::screenBuffers[this->game->screenBufferIndex[1]] = Image::createImage(264, 304));
+      (Game::screenBuffers[this->game->screenBufferIndex[1]] = Image::createImage(((this->game->screenColsTiles + 1) * 22), 304));
       (Game::screenBufferGraphics[this->game->screenBufferIndex[1]] = Game::screenBuffers[this->game->screenBufferIndex[1]]->getGraphics());
-      (Game::screenBuffers[3] = Image::createImage(264, 304));
+      (Game::screenBuffers[3] = Image::createImage(((this->game->screenColsTiles + 1) * 22), 304));
       (Game::screenBufferGraphics[3] = Game::screenBuffers[3]->getGraphics());
       (Game::screenBuffers[this->game->screenBufferIndex[6]] = Image::createImage(79, 63));
       (Game::screenBufferGraphics[this->game->screenBufferIndex[6]] = Game::screenBuffers[this->game->screenBufferIndex[6]]->getGraphics());

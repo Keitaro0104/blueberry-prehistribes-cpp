@@ -18,8 +18,6 @@ std::mutex& screenMutex() {
 namespace {
 
 const char* kWindowClass = "BlueberryTribesWindow";
-const int kGameW = 240;
-const int kGameH = 320;
 
 LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
    switch (msg) {
@@ -61,8 +59,17 @@ LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
 }  // namespace
 
-WinDisplay::WinDisplay(int scale, bool fullscreen)
-    : scale_(scale), fullscreen_(fullscreen) {}
+WinDisplay::WinDisplay(int scale, bool fullscreen, int logicalW,
+                       int logicalH)
+    : scale_(scale),
+      fullscreen_(fullscreen),
+      logicalW_(logicalW),
+      logicalH_(logicalH) {}
+
+void WinDisplay::setTargetClientSize(int w, int h) {
+   targetClientW_ = w;
+   targetClientH_ = h;
+}
 
 WinDisplay::~WinDisplay() {
    if (hwnd_) DestroyWindow(hwnd_);
@@ -80,8 +87,10 @@ bool WinDisplay::create(const std::string& title) {
       return false;
    }
    DWORD style = WS_OVERLAPPEDWINDOW;
-   int w = kGameW * scale_;
-   int h = kGameH * scale_;
+   // --aspect sets the window client size (1024x768 / 1280x720);
+   // otherwise the window is logical * scale.
+   int w = targetClientW_ > 0 ? targetClientW_ : logicalW_ * scale_;
+   int h = targetClientH_ > 0 ? targetClientH_ : logicalH_ * scale_;
    if (fullscreen_) {
       style = WS_POPUP;
       w = GetSystemMetrics(SM_CXSCREEN);
@@ -108,10 +117,12 @@ void WinDisplay::updateClientSize() {
 }
 
 RECT WinDisplay::destRect() const {
-   // Letterbox the 3:4 frame into the client area.
-   double scale = std::min((double)clientW_ / kGameW, (double)clientH_ / kGameH);
-   int dw = (int)(kGameW * scale);
-   int dh = (int)(kGameH * scale);
+   // Letterbox the logical frame (240x320 original, 427x320 4:3,
+   // 569x320 16:9) into the client area, keeping its aspect ratio.
+   double scale =
+       std::min((double)clientW_ / logicalW_, (double)clientH_ / logicalH_);
+   int dw = (int)(logicalW_ * scale);
+   int dh = (int)(logicalH_ * scale);
    RECT r;
    r.left = (clientW_ - dw) / 2;
    r.top = (clientH_ - dh) / 2;

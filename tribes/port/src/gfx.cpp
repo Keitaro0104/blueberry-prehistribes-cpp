@@ -85,6 +85,19 @@ Surface::Surface(Image* img) : w_(img->w), h_(img->h), px_(img->px) {
    clipH_ = h_;
 }
 
+void Surface::resize(int w, int h) {
+   if (w <= 0 || h <= 0) throw JavaException{"IllegalArgumentException"};
+   w_ = w;
+   h_ = h;
+   px_ = std::make_shared<std::vector<uint32_t>>((size_t)w * (size_t)h, 0);
+   clipX_ = 0;
+   clipY_ = 0;
+   clipW_ = w;
+   clipH_ = h;
+   tx_ = 0;
+   ty_ = 0;
+}
+
 void Surface::setColor(int rgb) {
    color_ = 0xFF000000u | (uint32_t)(rgb & 0x00FFFFFF);
 }

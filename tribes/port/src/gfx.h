@@ -61,6 +61,11 @@ class Surface {
   public:
    Surface(int w, int h);
    explicit Surface(Image* img);  // shares the image's pixels
+   // Resize a standalone surface, discarding its pixels (the clip and
+   // translation reset to the full surface). Used for the shell's screen
+   // Surface: it is resized to the --aspect logical width before the
+   // game starts, while nothing shares its storage yet.
+   void resize(int w, int h);
    int getWidth() const { return w_; }
    int getHeight() const { return h_; }
 
