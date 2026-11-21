@@ -1,4 +1,6 @@
-// modloader.h — no-repack mod loader, phase 1 (textures + maps).
+// modloader.h — no-repack mod loader, phase 1 (textures + maps) plus the
+// v0.2 `setup` extension (additive extra setup entries, applied after
+// the replaced level's original setup at level load).
 //
 // Own implementation. Design: tribes/docs/MOD-LOADER-DESIGN.md.
 // The loader is engine-level (shared by the Windows port and the future
@@ -34,7 +36,24 @@ void init(const std::string& modsDir);
 // text. Called once from ResourceLoader's constructor (after loadMaps),
 // via a counted SOURCE_PATCHES entry in tools/java2cpp.py. No-op when
 // no map mods are enabled.
+//
+// Extra `setup` entries from a winning map are NOT applied here: they
+// are additive and run later, at every level load, via applyExtraSetup
+// (below), after the original setup has spawned.
 void applyMods(Game* game);
+
+// Apply a winning map's extra `setup` entries (MOD-FORMAT v0.2,
+// additive). Called at the end of Game::spawnInitialEntities, via a
+// counted SOURCE_PATCHES entry in tools/java2cpp.py, so it runs after
+// the original setup at every level load, for the active missionIndex
+// only. Each entry is dispatched exactly like spawnInitialEntities
+// does (kind >= 0: building spawner; kind == -1: spawnVillager;
+// kind == -2: spawnEffect), after nudging (x, y) against the mod
+// map's tile occupancy (radius 8, same rule as applyMap). An entry
+// that cannot be placed is skipped with a warning, never a crash.
+// No-op when no map mod replaces the active level or the map has no
+// `setup` array.
+void applyExtraSetup(Game* game);
 
 // Return the mod replacement image for sprite (pack, index), or nullptr
 // to use the base image. `base` is the already-decoded base image, used

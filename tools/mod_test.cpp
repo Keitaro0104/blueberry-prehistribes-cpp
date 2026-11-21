@@ -279,6 +279,97 @@ int main(int argc, char** argv) {
              std::to_string((int)game->tableMapHeight) +
              " (want 64x48, untouched by mods)");
 
+   // --- extra setup (v0.2 additive): only when a mod replaces q=10 --
+   // (the full run's extra-setup-test mod). The baseline run has no
+   // mod map for q=10, so the hook is a no-op there.
+   if (ModLoader::hasModMap(10)) {
+      game->missionIndex = 10;
+      game->resetWorldState();
+      game->loadMap();
+      game->placeCameraStartPositions();
+      // Enemy building: kind 3 (Chief's hut) is absent from q=10's
+      // original enemy setup, so any slot 31-60 with type 3 is ours.
+      // Building slot s (31..60): occupied when entityData[8505+s]
+      // != 0; type = entityData[8749+s], x = entityData[8383+s],
+      // y = entityData[8444+s] (see the building spawner).
+      bool hutFound = false;
+      int hutSlot = -1, hutX = -1, hutY = -1;
+      for (int s = 31; s <= 60; s++) {
+         if (game->entityData[8505 + s] != 0 &&
+             game->entityData[8749 + s] == 3) {
+            hutFound = true;
+            hutSlot = s;
+            hutX = game->entityData[8383 + s];
+            hutY = game->entityData[8444 + s];
+         }
+      }
+      check(hutFound && hutX >= 0 && hutX < 48 && hutY >= 0 &&
+                hutY < 48,
+            "EXTRA-BUILDING",
+            hutFound ? ("enemy Chief's hut in slot " +
+                        std::to_string(hutSlot) + " at (" +
+                        std::to_string(hutX) + "," +
+                        std::to_string(hutY) + ")")
+                     : "no enemy building of type 3 (Chief's hut) "
+                       "found in slots 31-60");
+      // Enemy villager: param (age) 25 is absent from q=10's original
+      // enemy villagers, so any slot 51-100 with age 25 is ours.
+      // Villager slot s (51..100): occupied when entityData[1919+s]
+      // != 0; age = entityData[1414+s].
+      bool unitFound = false;
+      int unitSlot = -1, unitX = -1, unitY = -1;
+      int enemyVill = 0;
+      bool skippedFound = false;
+      for (int s = 51; s <= 100; s++) {
+         if (game->entityData[1919 + s] == 0) continue;
+         enemyVill++;
+         int age = game->entityData[1414 + s];
+         int x = game->entityData[s];
+         int y = game->entityData[101 + s];
+         if (age == 25) {
+            unitFound = true;
+            unitSlot = s;
+            unitX = x;
+            unitY = y;
+         }
+         if (age == 26) skippedFound = true;
+      }
+      check(unitFound && unitX >= 0 && unitX < 48 && unitY >= 0 &&
+                unitY < 48,
+            "EXTRA-UNIT",
+            unitFound ? ("enemy villager (age 25) in slot " +
+                         std::to_string(unitSlot) + " at (" +
+                         std::to_string(unitX) + "," +
+                         std::to_string(unitY) + ")")
+                      : "no enemy villager with age 25 found in slots "
+                        "51-100");
+      check(!skippedFound, "EXTRA-SKIPPED",
+            skippedFound
+                ? "the unplaceable entry (age 26) spawned, want skipped"
+                : "no enemy villager with age 26 (unplaceable entry "
+                  "skipped)");
+      check(enemyVill == 26, "EXTRA-COUNT",
+            std::to_string(enemyVill) +
+                " enemy villagers (want 26 = 25 original + 1 extra)");
+      // Effect entry: spawnEffect writes the type (packed) at
+      // entityData[9469+slot] and x/y at [9359]/[9381]. q=10's
+      // original setup has no effects, so any effect at (2,6) with
+      // type 1 is ours.
+      bool effectFound = false;
+      for (int v = 0; v < 22; v++) {
+         if (game->entityData[9469 + v] == 1 &&
+             game->entityData[9359 + v] == 2 &&
+             game->entityData[9381 + v] == 6) {
+            effectFound = true;
+         }
+      }
+      check(effectFound, "EXTRA-EFFECT",
+            effectFound ? "effect (type 1) at (2,6)"
+                        : "no effect with type 1 at (2,6)");
+   } else {
+      std::printf("EXTRA-SETUP skipped (no mod map for q=10)\n");
+   }
+
    crashlog::shutdown("mod test done");
    std::printf("mod_test: %s (%d failure(s))\n",
                failures == 0 ? "PASS" : "FAIL", failures);

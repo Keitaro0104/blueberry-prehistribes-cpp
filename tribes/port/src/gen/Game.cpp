@@ -6025,6 +6025,7 @@ void Game::spawnInitialEntities() {
          (this->spawnTribe = 2);
       }
    }
+   ModLoader::applyExtraSetup(this);
 }
 
 int8_t Game::spawnVillager(int8_t var1, int8_t var2, int8_t var3, int8_t var4, int8_t var5) {

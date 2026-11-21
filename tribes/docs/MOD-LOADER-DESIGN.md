@@ -390,7 +390,7 @@ raw fields of the setup table, whose meanings are read from
 | f1 | `kind` | `>= 0` → spawn building via the 5-arg spawner (`a_byte_int_int_int_int_boolean_int_byte`, `true, -1`); `== -1` → `spawnVillager(...)`; `== -2` → `spawnEffect(1, x, y, f0)`. |
 | f2 | `x` | Tile column. |
 | f3 | `y` | Tile row. |
-| f4 | `param` | 4th `spawnVillager` argument / 5th building-spawner argument. **Exact meaning per kind is to be confirmed during implementation** — the Green Valley repack kept f0/f1/f4 intact and only nudged x/y, which is why it worked without understanding f4. |
+| f4 | `param` | 4th `spawnVillager` argument / 5th building-spawner argument. **Confirmed during implementation (2026-11-21):** villager = AGE (`entityData[1414]`, bands < 12 child / < 30 / < 50); building = LEVEL, 0 = auto default from rec 113 per mission group (q < 2 → +0, q == 2 → +12, else +24). For effects `param` is ignored (the dispatch passes only f0). |
 
 A v0.2 map may omit `setup`; then the loader reuses the setup
 table of the level it replaces (phase 1, replace mode) — but the
@@ -401,6 +401,66 @@ when any entry cannot be placed (the repack proof's rule: nudge
 within the map, never place outside it; 0 unplaceable is the bar).
 Per-entry nudge lines are not logged — Green Valley alone nudges
 20 entries, which would flood the log.
+
+**Additive `setup`: the implemented rule (2026-11-21).** When a
+v0.2 map *does* carry a `setup` array, the entries are ADDITIVE:
+they are applied AFTER the replaced level's original setup (already
+rescaled + nudged by `applyMods`), which stays untouched. There is
+no rec 250+q rewrite — the extra entries never enter the table;
+they are spawned directly at level load. This is what the map
+editor exports for enemy markers: enemy building
+`{"packed":1,"kind":<0-11>,"x":c,"y":r,"param":0}`, enemy unit
+`{"packed":1,"kind":-1,"x":c,"y":r,"param":25}`.
+
+- **Hook.** `ModLoader::applyExtraSetup(game)` at the end of
+  `Game::spawnInitialEntities` (SOURCE_PATCHES patch 8 in
+  `tools/java2cpp.py`), so it runs after the original setup at
+  every level load, for the active `missionIndex` only. No-op when
+  no map mod replaces that level or the map has no `setup` array.
+- **Dispatch** mirrors `spawnInitialEntities` exactly: kind >= 0
+  → building spawner `(packed, kind, x, y, param, true, -1)`;
+  kind == -1 → `spawnVillager(packed & 1, x, y, param, (packed >>
+  1) + difficulty-if-tribe-1)`; kind == -2 → `spawnEffect(1, x, y,
+  packed)`.
+- **Validation** (`validateMap`, same style as the other checks):
+  `packed`/`kind`/`x`/`y`/`param` must be integers; `packed`
+  0..127 (buildings 0/1 only — the tribe byte, slots 1–30 / 31–60;
+  effects 0..2 — `effectCounters` has 3 entries, and the base
+  data's packed-3/4 effects only occur on q=3, where the
+  increment is skipped); `kind` -2..11; `x`/`y` inside the map;
+  `param` 0..127. Any bad entry rejects the whole map JSON with a
+  clear message (a broken mod is skipped, the game never dies).
+- **Nudge.** Villagers: `nearestFree` (radius 8). Buildings:
+  `placeBuildingFootprint` (spiral radius 8, same order as the
+  repack proof) with the game's own footprint check as the
+  acceptor — a tile-free candidate rejected by the game (an
+  already-placed building occupies part of it; placed buildings
+  live in `occupantGrid`, which the tile nudge cannot see) keeps
+  walking the spiral instead of dropping the entry. Effects are
+  never nudged. Placed extras are marked occupied as they go, so
+  extras never stack on each other. An entry with no placement in
+  radius 8 is skipped (a failed spawner attempt is side-effect-free:
+  it returns -2 before any write). Skipped entries never crash.
+- **Log line.** `MOD: <owner> extra setup q=<q>: <n> entries (<v>
+  villagers, <b> buildings, <e> effects), <n> nudged, <s>
+  skipped`, plus a WARNING line when `<s> > 0`.
+- **Building types 0–11** (footprints from rec 138 +104/+130):
+  0 Armoury 3×2, 1 Gym 5×4, 2 Hut 2×2, 3 Chief's hut 4×4,
+  4 Kitchen 4×3, 5 Range 6×4, 6 Store 3×3, 7 Disco 5×4,
+  8 Sanctuary 3×3, 9 PIA center 4×4, 10 Nursery 4×4, 11 Tower
+  1×1. Enemy tribe = 1: enemy villagers occupy slots 51–100,
+  enemy buildings slots 31–60.
+- **Win flag.** Rec 279 bit 1 (win by destroying all enemy
+  buildings) counts extra enemy buildings too — they occupy slots
+  31–60 like any enemy building, so adding enemy buildings makes
+  the win condition harder, as the map author intends.
+- **Proving gate.** `tools/run_mod_test.sh` (full run): the
+  `extra-setup-test` mod (48×48 map for q=10 with 4 setup
+  entries) — enemy Chief's hut in a slot 31–60, enemy villager
+  (age 25) in a slot 51–100, the rock-block-centre villager
+  skipped, 26 enemy villagers total (25 original + 1 extra),
+  effect at (2,6), log line `4 entries (2 villagers, 1 buildings,
+  1 effects), 0 nudged, 1 skipped`.
 
 **Slot modes.**
 

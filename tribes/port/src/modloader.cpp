@@ -1,4 +1,6 @@
-// modloader.cpp — no-repack mod loader, phase 1 (textures + maps).
+// modloader.cpp — no-repack mod loader, phase 1 (textures + maps)
+// plus the v0.2 `setup` extension (additive extra setup entries,
+// applied after the replaced level's original setup at level load).
 //
 // Own implementation. Design: tribes/docs/MOD-LOADER-DESIGN.md §0-§4.2,
 // §6-§7. Phase 1 covers mod discovery (mod.json v0.2; v0.1 loads
@@ -34,6 +36,7 @@
 #include <map>
 #include <set>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 
 #include "crashlog.h"
@@ -304,6 +307,20 @@ std::string trim(const std::string& s) {
 // ---------------------------------------------------------------------------
 // Mod data (validated at discovery, applied at load time).
 // ---------------------------------------------------------------------------
+// One v0.2 `setup` entry: the 5 raw fields of a setup-table row
+// (MOD-LOADER-DESIGN.md §4.2). `packed` is f0 (villager: bit 0 =
+// tribe, >> 1 = level; building/effect: passed through as the 1st
+// spawn argument), `kind` is f1 (>= 0 building type, -1 villager,
+// -2 effect), `x`/`y` are the tile column/row, `param` is f4
+// (villager age / building level, 0 = auto default).
+struct SetupEntry {
+   int packed = 0;
+   int kind = 0;
+   int x = 0;
+   int y = 0;
+   int param = 0;
+};
+
 struct ModMap {
    std::string id;
    std::string name;
@@ -315,6 +332,10 @@ struct ModMap {
    int playerStartRow = 0;
    int playerStartCol = 0;
    int flags = 0;
+   // v0.2 additive extra setup (empty = reuse the replaced level's
+   // setup only). Applied by applyExtraSetup after the original setup
+   // spawns at every level load; the original setup is untouched.
+   std::vector<SetupEntry> setup;
    std::string file;  // relative path inside the mod folder
 };
 
@@ -490,6 +511,55 @@ bool validateMap(const Json& j, const std::string& modId,
       return fail("win_by_destroying_enemy_buildings != flags & 1");
    if (loseB->b != ((out.flags & 2) != 0))
       return fail("lose_if_key_building_destroyed != flags & 2");
+   // v0.2 additive extra setup (optional). Each entry is one
+   // setup-table row in raw form; a single bad entry rejects the
+   // whole map (a broken mod is skipped, the game never dies).
+   // Bounds follow the storage: packed/kind/param are bytes in the
+   // original table, x/y must land inside this map. Buildings take
+   // packed 0/1 only (the tribe byte: slots 1-30 / 31-60).
+   const Json* setup = j.get("setup");
+   if (setup) {
+      if (setup->type != Json::Arr) return fail("setup must be an array");
+      for (auto& se : setup->arr) {
+         if (se.type != Json::Obj)
+            return fail("setup entries must be objects");
+         const Json* pk = se.get("packed");
+         const Json* kd = se.get("kind");
+         const Json* sx = se.get("x");
+         const Json* sy = se.get("y");
+         const Json* pm = se.get("param");
+         if (!pk || !pk->isInt() || !kd || !kd->isInt() || !sx ||
+             !sx->isInt() || !sy || !sy->isInt() || !pm || !pm->isInt())
+            return fail("setup entry needs integer "
+                        "packed/kind/x/y/param");
+         SetupEntry e;
+         e.packed = pk->asInt();
+         e.kind = kd->asInt();
+         e.x = sx->asInt();
+         e.y = sy->asInt();
+         e.param = pm->asInt();
+         if (e.packed < 0 || e.packed > 127)
+            return fail("setup packed outside 0..127");
+         if (e.kind < -2 || e.kind > 11)
+            return fail("setup kind outside -2..11 (buildings 0..11, "
+                        "-1 villager, -2 effect)");
+         if (e.kind >= 0 && e.packed > 1)
+            return fail("setup building packed must be 0 or 1 (tribe)");
+         // Effects index effectCounters (3 entries, Game.java:796);
+         // the base data only ever uses packed 0..2 outside q=3 (on
+         // q=3 the increment is skipped). Anything larger would index
+         // out of bounds at spawn time.
+         if (e.kind == -2 && e.packed > 2)
+            return fail("setup effect packed must be 0..2 "
+                        "(effectCounters has 3 entries)");
+         if (e.x < 0 || e.x >= out.width || e.y < 0 ||
+             e.y >= out.height)
+            return fail("setup x/y outside the map");
+         if (e.param < 0 || e.param > 127)
+            return fail("setup param outside 0..127");
+         out.setup.push_back(e);
+      }
+   }
    out.file = file;
    return true;
 }
@@ -965,6 +1035,68 @@ bool nearestFree(const std::vector<std::vector<char>>& occ, int w, int h,
    return false;
 }
 
+// Building footprint (w x h) from /a rec 138 (+104 width, +130
+// height), 1x1 when the type has no size row.
+void buildingFootprint(Game* game, int type, int& bw, int& bh) {
+   auto& fileA = game->fileAData;
+   auto& starts = game->recordStarts;
+   auto u8 = [&](int i) { return fileA[i] & 0xFF; };
+   bw = 1;
+   bh = 1;
+   if (type >= 0 && type < 26) {
+      bw = u8(starts[138] + 4 * 26 + type);
+      bh = u8(starts[138] + 5 * 26 + type);
+      if (bw <= 0) bw = 1;
+      if (bh <= 0) bh = 1;
+   }
+}
+
+// Find a free footprint for building `type` at/near (nx, ny) on the
+// occupancy grid, spiral search, max radius 8. Ported exactly from
+// repack_jar.py (same scan order as the repack proof). For each
+// tile-free candidate, `accept` is called; the first accepted
+// candidate is marked occupied in occ and returned via (px, py).
+// With no acceptor, the first tile-free candidate wins (the applyMap
+// behavior). Returns false when no candidate fits (or none is
+// accepted).
+template <typename Accept = std::nullptr_t>
+bool placeBuildingFootprint(Game* game,
+                            std::vector<std::vector<char>>& occ, int w,
+                            int h, int type, int nx, int ny, int& px,
+                            int& py, Accept&& accept = nullptr) {
+   int bw = 1, bh = 1;
+   buildingFootprint(game, type, bw, bh);
+   auto footprintOk = [&](int fx, int fy) {
+      if (fx < 0 || fy < 0 || fx + bw > w || fy + bh > h) return false;
+      for (int dy = 0; dy < bh; dy++)
+         for (int dx = 0; dx < bw; dx++)
+            if (occ[fy + dy][fx + dx] != 0) return false;
+      return true;
+   };
+   auto tryCandidate = [&](int cx, int cy) -> bool {
+      if (!footprintOk(cx, cy)) return false;
+      if constexpr (!std::is_same_v<std::decay_t<Accept>,
+                                    std::nullptr_t>) {
+         if (!accept(cx, cy)) return false;
+      }
+      px = cx;
+      py = cy;
+      for (int dy = 0; dy < bh; dy++)
+         for (int dx = 0; dx < bw; dx++) occ[cy + dy][cx + dx] = 1;
+      return true;
+   };
+   if (tryCandidate(nx, ny)) return true;
+   for (int radius = 1; radius <= 8; radius++) {
+      for (int dy = -radius; dy <= radius; dy++) {
+         for (int dx = -radius; dx <= radius; dx++) {
+            if (std::max(std::abs(dx), std::abs(dy)) != radius) continue;
+            if (tryCandidate(nx + dx, ny + dy)) return true;
+         }
+      }
+   }
+   return false;
+}
+
 // Apply one winning map override to level q. Patches rec 149 (size),
 // rec 279 (win/lose flags), the setup table (rec 250+q, scaled +
 // nudged), and rec 150 (camera start = centroid of the remapped player
@@ -1011,50 +1143,12 @@ void applyMap(Game* game, int q, const ModMap& mp, const std::string& owner) {
          }
       } else if (f1s >= 0) {
          buildings++;
-         int type = f1s;
-         int bw = 1, bh = 1;
-         if (type >= 0 && type < 26) {
-            bw = u8(starts[138] + 4 * 26 + type);
-            bh = u8(starts[138] + 5 * 26 + type);
-            if (bw <= 0) bw = 1;
-            if (bh <= 0) bh = 1;
-         }
-         auto footprintOk = [&](int fx, int fy) {
-            if (fx < 0 || fy < 0 || fx + bw > mp.width ||
-                fy + bh > mp.height)
-               return false;
-            for (int dy = 0; dy < bh; dy++)
-               for (int dx = 0; dx < bw; dx++)
-                  if (occ[fy + dy][fx + dx] != 0) return false;
-            return true;
-         };
-         bool placed = false;
          int px = nx, py = ny;
-         if (footprintOk(nx, ny)) {
-            placed = true;
-         } else {
-            for (int radius = 1; radius <= 8 && !placed; radius++) {
-               for (int dy = -radius; dy <= radius && !placed; dy++) {
-                  for (int dx = -radius; dx <= radius; dx++) {
-                     if (std::max(std::abs(dx), std::abs(dy)) != radius)
-                        continue;
-                     if (footprintOk(nx + dx, ny + dy)) {
-                        px = nx + dx;
-                        py = ny + dy;
-                        placed = true;
-                        break;
-                     }
-                  }
-               }
-            }
-         }
-         if (placed) {
+         if (placeBuildingFootprint(game, occ, mp.width, mp.height,
+                                    f1s, nx, ny, px, py)) {
             if (px != nx || py != ny) nudged++;
             nx = px;
             ny = py;
-            for (int dy = 0; dy < bh; dy++)
-               for (int dx = 0; dx < bw; dx++)
-                  occ[ny + dy][nx + dx] = 1;
          } else {
             unplaceable++;
          }
@@ -1176,6 +1270,94 @@ void applyMods(Game* game) {
       applyMap(game, q, *mp, mapOwner_[q]);
       applyMapName(game, q, mp->name, mapOwner_[q]);
    }
+}
+
+// Apply a winning map's extra `setup` entries (MOD-FORMAT v0.2,
+// additive). Runs at the end of Game::spawnInitialEntities, so after
+// the original setup at every level load, for the active missionIndex
+// only. The replaced level's original setup (already rescaled +
+// nudged by applyMap) is untouched; these entries are placed on top
+// of it, dispatched exactly like spawnInitialEntities does.
+//
+// Nudge rule: (x, y) is nudged against the mod map's tile occupancy
+// (radius 8, same rule as applyMap; extra buildings reuse
+// placeBuildingFootprint, extra villagers nearestFree). The game's
+// own footprint check is a second layer for buildings: a tile-free
+// candidate can still be rejected when an already-placed building
+// occupies part of it (placed buildings live in occupantGrid, which
+// the tile nudge cannot see), so the spiral keeps walking and tries
+// the next tile-free candidate instead of dropping the entry; only
+// when no candidate in radius 8 is accepted is the entry skipped.
+// A skipped entry never crashes the game. No-op when no map mod
+// replaces the active level or the map has no `setup` array.
+void applyExtraSetup(Game* game) {
+   if (!initialized_ || !game) return;
+   int q = (int)game->missionIndex;
+   auto it = mapBySlot_.find(q);
+   if (it == mapBySlot_.end()) return;
+   const ModMap* mp = it->second;
+   if (mp->setup.empty()) return;
+   const std::string& owner = mapOwner_[q];
+   auto occ = computeOccupancy(game, mp->tiles, mp->width, mp->height);
+   int villagers = 0, buildings = 0, effects = 0, nudged = 0, skipped = 0;
+   for (auto& e : mp->setup) {
+      if (e.kind == -1) {
+         villagers++;
+         int ox = e.x, oy = e.y;
+         if (nearestFree(occ, mp->width, mp->height, e.x, e.y, ox, oy)) {
+            if (ox != e.x || oy != e.y) nudged++;
+            int level = (e.packed >> 1) +
+                        ((e.packed & 1) != 0
+                             ? (int)game->selectedDifficulty
+                             : 0);
+            int8_t slot = game->spawnVillager((int8_t)(e.packed & 1),
+                                              (int8_t)ox, (int8_t)oy,
+                                              (int8_t)e.param,
+                                              (int8_t)level);
+            if (slot < 0) {
+               skipped++;
+            } else {
+               occ[oy][ox] = 1;
+            }
+         } else {
+            skipped++;
+         }
+      } else if (e.kind >= 0) {
+         buildings++;
+         int px = e.x, py = e.y;
+         // The game's own footprint check is the final authority: a
+         // tile-free candidate can still be rejected when an
+         // already-placed building occupies part of it (placed
+         // buildings live in occupantGrid, which the tile nudge
+         // cannot see). Pass the spawner as the acceptor, so the
+         // spiral keeps walking and tries the next tile-free
+         // candidate instead of dropping the entry. A failed attempt
+         // is side-effect-free (the spawner returns -2 before any
+         // write), so retrying is safe.
+         auto accept = [&](int cx, int cy) {
+            return game->a_byte_int_int_int_int_boolean_int_byte(
+                       (int8_t)e.packed, e.kind, cx, cy, e.param,
+                       true, -1) >= 0;
+         };
+         if (placeBuildingFootprint(game, occ, mp->width, mp->height,
+                                    e.kind, e.x, e.y, px, py, accept)) {
+            if (px != e.x || py != e.y) nudged++;
+         } else {
+            skipped++;
+         }
+      } else {  // e.kind == -2: effect, placed as-is, never nudged.
+         effects++;
+         game->spawnEffect(1, e.x, e.y, e.packed);
+      }
+   }
+   crashlog::log("MOD: %s extra setup q=%d: %d entries (%d villagers, "
+                 "%d buildings, %d effects), %d nudged, %d skipped",
+                 owner.c_str(), q, (int)mp->setup.size(), villagers,
+                 buildings, effects, nudged, skipped);
+   if (skipped > 0)
+      crashlog::log("MOD: %s WARNING: %d extra setup entries could not "
+                    "be placed (skipped)",
+                    owner.c_str(), skipped);
 }
 
 Image* spriteOverride(Game* game, int pack, int index, Image* base) {

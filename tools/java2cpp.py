@@ -96,10 +96,10 @@ OVERRIDES = {
 # and the generated code stays reproducible from tribes/src/ plus this
 # list. Never edit tribes/src/ or tribes/port/src/gen/ by hand.
 #
-# Patches 2-6 are a second kind: mod-loader hooks (design
+# Patches 2-6 and 8 are a second kind: mod-loader hooks (design
 # tribes/docs/MOD-LOADER-DESIGN.md). They are not decompiler-error
 # corrections -- they wire the hand-written ModLoader into the generated
-# code at the four engine seams. The same exactly-once rule applies.
+# code at the six engine seams. The same exactly-once rule applies.
 #
 # Patch 7 is a third kind: an INTENTIONAL BEHAVIOR CHANGE, not a
 # decompiler-error correction and not a loader hook. It is the port
@@ -169,6 +169,33 @@ SOURCE_PATCHES = [
     ("Game.java",
      "      } else if (this.campaignProgress <= 0 && !this.cheatUnlockedCustom) {",
      "      } else if (false) {"),
+    # 8. Game.spawnInitialEntities: apply the winning map's extra
+    #    `setup` entries (MOD-FORMAT v0.2, additive) after the
+    #    original setup. ModLoader.applyExtraSetup runs at every
+    #    level load for the active missionIndex only and is a no-op
+    #    when no map mod replaces that level or the map has no
+    #    `setup` array. The replaced level's original setup (rec
+    #    250+q, already rescaled + nudged by applyMods) is untouched.
+    ("Game.java",
+     "      if (this.missionIndex == 0) {\n"
+     "         this.entityData[7476] = 4;\n"
+     "         this.entityData[7479] = 5;\n"
+     "      } else {\n"
+     "         if (this.missionIndex == 3) {\n"
+     "            this.spawnTribe = 2;\n"
+     "         }\n"
+     "      }\n"
+     "   }",
+     "      if (this.missionIndex == 0) {\n"
+     "         this.entityData[7476] = 4;\n"
+     "         this.entityData[7479] = 5;\n"
+     "      } else {\n"
+     "         if (this.missionIndex == 3) {\n"
+     "            this.spawnTribe = 2;\n"
+     "         }\n"
+     "      }\n"
+     "      ModLoader.applyExtraSetup(this);\n"
+     "   }"),
 ]
 
 
@@ -487,6 +514,7 @@ LIB_METHODS = {
     # ModLoader (hand-written, tribes/port/src/modloader.h): the mod
     # hooks called from the counted SOURCE_PATCHES below.
     ("ModLoader", "applyMods"): (("prim", "void"), True),
+    ("ModLoader", "applyExtraSetup"): (("prim", "void"), True),
     ("ModLoader", "spriteOverride"): (("cls", "Image"), True),
     ("ModLoader", "hasModMap"): (("prim", "bool"), True),
     ("ModLoader", "modMapTile"): (("prim", "int"), True),
