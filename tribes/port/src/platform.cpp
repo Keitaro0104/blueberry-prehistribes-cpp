@@ -223,6 +223,12 @@ class WinMidiPlayer : public Player {
       applyVolume();
       stopRequested_.store(false);
       startMs_ = nowMs();
+      // The previous song's sequencer may have finished without being joined:
+      // stop() only joins while state==400, but a naturally-ended song leaves
+      // state==300 with a joinable thread. Move-assigning a new std::thread
+      // over a joinable one calls std::terminate() -> SIGABRT -- this crashed
+      // the game at the second song on real Windows PCs. Join it first.
+      if (thread_.joinable()) thread_.join();
       thread_ = std::thread([this]() { sequencer(); });
       setState(400);
    }
@@ -240,6 +246,10 @@ class WinMidiPlayer : public Player {
 
    void close() override {
       if (getState() == 400) stop();
+      // A naturally-ended song leaves state==300 with a finished but still
+      // joinable sequencer thread; destroying the player (or closing it)
+      // with a joinable thread would call std::terminate().
+      if (thread_.joinable()) thread_.join();
       if (out_ != nullptr) {
          midiOutClose(out_);
          out_ = nullptr;
@@ -258,6 +268,15 @@ class WinMidiPlayer : public Player {
       // Logged (not silent): a missing MIDI device is the prime suspect
       // when the game has no sound, and the error code says why.
       UINT devs = midiOutGetNumDevs();
+      // Close any previous handle first: the Microsoft GS Wavetable Synth
+      // behind MIDI_MAPPER allows a single open, and opening again while the
+      // previous handle is still open fails with MMSYSERR_ALLOCATED
+      // (error 4). That happens when the same track is picked again after
+      // the previous song ended (the handle is only closed in close()).
+      if (out_ != nullptr) {
+         midiOutClose(out_);
+         out_ = nullptr;
+      }
       MMRESULT rc = midiOutOpen(&out_, MIDI_MAPPER, 0, 0, CALLBACK_NULL);
       if (rc != MMSYSERR_NOERROR) {
          crashlog::log(
