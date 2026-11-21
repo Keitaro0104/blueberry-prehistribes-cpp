@@ -9,6 +9,7 @@
 #
 # Usage: tools/run_linux_smoke.sh [--play] [--seconds N] [--trace]
 #   --play       send a scripted FIRE key to the menu (start a new game)
+#   --no-interp  disable render interpolation (old 1-render-per-tick)
 #   --seconds N  run duration (default 12)
 #   --trace      per-second state output
 # The final frame is written to /tmp/tribes-build/smoke.bmp; the script
@@ -26,11 +27,13 @@ BMP="$BUILD_DIR/smoke.bmp"
 PLAY=""
 SECONDS_ARG="12"
 TRACE=""
+NOINTERP=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --play) PLAY="--play"; shift ;;
     --seconds) SECONDS_ARG="$2"; shift 2 ;;
     --trace) TRACE="--trace"; shift ;;
+    --no-interp) NOINTERP="--no-interp"; shift ;;
     --mods) MODS_DIR="$2"; shift 2 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -56,7 +59,7 @@ echo "== running the smoke test (${SECONDS_ARG}s) =="
 MODS_ARG=""
 if [ -n "$MODS_DIR" ]; then MODS_ARG="--mods $MODS_DIR"; fi
 "$BUILD_DIR/linux_smoke" --data "$DATA_DIR" --saves "$SAVES_DIR" \
-  --seconds "$SECONDS_ARG" --dump "$BMP" $PLAY $TRACE $MODS_ARG
+  --seconds "$SECONDS_ARG" --dump "$BMP" $PLAY $TRACE $NOINTERP $MODS_ARG
 
 echo "== checking the dumped frame =="
 python3 - "$BMP" <<'EOF'

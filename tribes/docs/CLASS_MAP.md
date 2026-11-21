@@ -5,7 +5,7 @@ Obfuscated name → role, with confidence and evidence. Only members whose role 
 | Class | Role | Confidence | Evidence |
 | --- | --- | --- | --- |
 | `tribes` | MIDlet entry point | Certain | `extends MIDlet`, 78 lines; `startApp` starts the game thread, shows splash `d`, then `new f(this)`. |
-| `f` | Main game: Canvas, game loop, menus, save/load | Certain | 6,680 lines; owns the screen state `Q`, mode `v` (0 menu, 1 in-game), the 20 ticks/s loop, RecordStore `t0`/`t1`/`t2` handling. |
+| `f` | Main game: Canvas, game loop, menus, save/load | Certain | 6,680 lines; owns the screen state `Q`, mode `v` (0 menu, 1 in-game), the ~8.33 ticks/s loop (120 ms/tick), RecordStore `t0`/`t1`/`t2` handling. |
 | `b` | World logic and AI | Certain | 5,805 lines; owns the 96x96 grids, tribes, villagers, buildings, waves, win/lose check `b.ak()`. |
 | `e` | Resource loader | Certain | 280 lines; loads files from the JAR (`/a`, `ma`, `pi0`/`pi8`/`pi9`, `sa`). |
 | `c` | Text loader | Certain | 404 lines; loads the 5 languages (`s` 229 UI strings, `t` 72 help, `d0` 236 story pieces). |
@@ -160,7 +160,7 @@ How class `b` works
    (resources 0–4 capped at 999, population, chief id, building count). The 96x96 world is
    tracked by `occupancyGrid` (0 empty, 1–100 villager, negative building/trap codes, −128
    moving) plus a spatial hash (`hashNext`, rebuilt by `rebuildSpatialHash`) and a fog grid.
-2. **Tick order (20 ticks/sec).** The Game calls `tickBuildings`, `tickWorld`, `tickAnimals`,
+2. **Tick order (~8.33 ticks/sec, 120 ms/tick).** The Game calls `tickBuildings`, `tickWorld`, `tickAnimals`,
    `tickDirector` per tick. `tickWorld` runs a preamble, then per tribe per villager:
    pre-check → move state → sick check → action selector → task progress → movement →
    post-move action → projectile step; then hut births, the projectile grid, the calm timer
@@ -592,7 +592,7 @@ offset table (`fieldOffsets[23+I]` = 2323/2424/2525/2626) with group bases `offs
 
 How class f works
 
-1. `f` is the whole game: a MIDP `Canvas` + `Runnable` (~20 ticks/s) holding all state, menus, rendering, input, save/load.
+1. `f` is the whole game: a MIDP `Canvas` + `Runnable` (~8.33 ticks/s, 120 ms/tick) holding all state, menus, rendering, input, save/load.
 2. `run()` starts the thread: `f()` (init: create World/TextLoader/MidiPlayer, load pd0 tables via `e`, read manifest
    properties) then `g()` (allocate all arrays), then tries `loadSlot(0)` and falls back to `loadSlot(1)`/`(2)`.
 3. The tick loop: `aS()` (pause/music check) → `h()` (per-tick update: input flags, timers, message advance every

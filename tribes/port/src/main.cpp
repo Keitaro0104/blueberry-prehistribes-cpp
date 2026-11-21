@@ -109,7 +109,9 @@ void printUsage() {
        "  --scale N       window scale, default 3 (720x960)\n"
        "  --dump <bmp>    headless: write the final frame to <bmp>\n"
        "  --bench <secs>  headless: run N seconds, report frames presented\n"
-       "  --trace         verbose progress output\n");
+       "  --trace         verbose progress output\n"
+       "  --no-interp     disable render interpolation (old 1-render-per-tick\n"
+       "                  behaviour; logic rate unchanged either way)\n");
 }
 
 }  // namespace
@@ -123,6 +125,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR cmdLine, int) {
    double benchSeconds = 0.0;
    bool fullscreen = false;
    int scale = 3;
+   bool noInterp = false;
 
    // Minimal argument parsing (no external dependency).
    {
@@ -171,6 +174,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR cmdLine, int) {
             i++;
          } else if (a == "--trace") {
             g_trace = true;
+         } else if (a == "--no-interp") {
+            noInterp = true;
          } else if (a == "--help" || a == "-h") {
             printUsage();
             return 0;
@@ -208,6 +213,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR cmdLine, int) {
    // Discover mods before the game starts (a missing mods folder is
    // fine — the loader is a no-op and the game runs exactly as before).
    ModLoader::init(modsDir);
+   if (noInterp) {
+      Game::interpEnabled = false;
+   }
+   trace("render interpolation: %s\n",
+         noInterp ? "OFF (--no-interp)" : "ON");
    trace("exe dir: %s\n", exeDir.c_str());
    trace("data dir: %s\n", dataDir.c_str());
    trace("save dir: %s\n", saveDir.c_str());

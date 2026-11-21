@@ -1841,8 +1841,8 @@ void Game::drawEntitySprite(int var1) {
          }
          (var8 = false);
          (var4 = this->entityData[(7676 + var1)]);
-         (var6 = (((0 + ((this->entityData[(5252 + var1)] - this->camTileX) * 22)) + 11) + this->entityData[(5454 + var1)]));
-         (var7 = (((((0 + ((this->entityData[(5353 + var1)] - this->camTileY) * 16)) + 8) + this->entityData[(5555 + var1)]) - this->spriteYOffsetTable[this->entityData[(5858 + var1)]][var1]) - 10));
+         (var6 = (this->interpProjX(var1) - (this->camTileX * 22)));
+         (var7 = (((this->interpProjY(var1) - (this->camTileY * 16)) - this->spriteYOffsetTable[this->entityData[(5858 + var1)]][var1]) - 10));
          if (((((var5 = this->entityData[(6565 + var1)]) == 1) || (var5 == 2)) || (var5 == 5))) {
             this->a_int_int_int_void(((292 + this->fileAData[((this->recordStarts[(190 + this->fileAData[(this->recordStarts[77] + var5)])] + (var4 * this->fileAData[((this->recordStarts[193] + 6) + var5)])) + this->spriteFrameTable[this->entityData[(5858 + var1)]][var1])]) + this->fileAData[(this->recordStarts[193] + var5)]), var6, var7);
          }
@@ -3290,6 +3290,163 @@ void Game::initGame() {
    this->drawLoadProgress(0);
    this->midlet->display->setCurrent(this);
    (this->loadingDone = true);
+}
+
+int Game::interpAnimalX(int var1, int var2) {
+   if (((!interpEnabled || (this->interpAlpha >= 256)) || (this->interpPrevAnimalX == nullptr))) {
+      return this->entityData[(9403 + var1)];
+   }
+   int var3 = (this->interpCurAnimalX[var1] - this->interpPrevAnimalX[var1]);
+   if (((var3 > 48) || (var3 < -48))) {
+      return this->entityData[(9403 + var1)];
+   }
+   return (((this->interpPrevAnimalX[var1] + ((var3 * this->interpAlpha) / 256)) - (this->camTileX * 22)) - var2);
+}
+
+int Game::interpAnimalY(int var1, int var2) {
+   if (((!interpEnabled || (this->interpAlpha >= 256)) || (this->interpPrevAnimalY == nullptr))) {
+      return this->entityData[(9425 + var1)];
+   }
+   int var3 = (this->interpCurAnimalY[var1] - this->interpPrevAnimalY[var1]);
+   if (((var3 > 48) || (var3 < -48))) {
+      return this->entityData[(9425 + var1)];
+   }
+   return (((this->interpPrevAnimalY[var1] + ((var3 * this->interpAlpha) / 256)) - (this->camTileY * 16)) - var2);
+}
+
+void Game::interpApply() {
+   (this->interpApplied = false);
+   if ((!interpEnabled || (this->interpAlpha >= 256))) {
+      return;
+   }
+   int var1 = (this->interpCurCamX - this->interpPrevCamX);
+   int var2 = (this->interpCurCamY - this->interpPrevCamY);
+   if (((((var1 > 48) || (var1 < -48)) || (var2 > 48)) || (var2 < -48))) {
+      return;
+   }
+   int var3 = (this->interpPrevCamX + ((var1 * this->interpAlpha) / 256));
+   int var4 = (this->interpPrevCamY + ((var2 * this->interpAlpha) / 256));
+   (this->interpSavedScrollX = this->scrollXPx);
+   (this->interpSavedScrollY = this->scrollYPx);
+   (this->scrollXPx = (((this->camTileX * 22) + 11) - var3));
+   (this->scrollYPx = (((this->camTileY * 16) + 8) - var4));
+   (this->interpApplied = true);
+}
+
+void Game::interpCapture() {
+   for (int i = 1; (i <= 100); i++) {
+      (this->interpCurEntX[i] = ((this->entityData[(0 + i)] * 22) + this->entityData[(202 + i)]));
+      (this->interpCurEntY[i] = ((this->entityData[(101 + i)] * 16) + this->entityData[(303 + i)]));
+      (this->interpCurProjX[i] = (((this->entityData[(5252 + i)] * 22) + 11) + this->entityData[(5454 + i)]));
+      (this->interpCurProjY[i] = (((this->entityData[(5353 + i)] * 16) + 8) + this->entityData[(5555 + i)]));
+   }
+   for (int i = 0; (i < 22); i++) {
+      (this->interpCurAnimalX[i] = ((this->entityData[(9359 + i)] * 22) + this->entityData[(9403 + i)]));
+      (this->interpCurAnimalY[i] = ((this->entityData[(9381 + i)] * 16) + this->entityData[(9425 + i)]));
+   }
+   (this->interpCurCamX = (((this->camTileX * 22) + 11) - this->scrollXPx));
+   (this->interpCurCamY = (((this->camTileY * 16) + 8) - this->scrollYPx));
+}
+
+int Game::interpEntX(int var1, int var2) {
+   if (((!interpEnabled || (this->interpAlpha >= 256)) || (this->interpPrevEntX == nullptr))) {
+      return this->entityData[(202 + var1)];
+   }
+   int var3 = (this->interpCurEntX[var1] - this->interpPrevEntX[var1]);
+   if (((var3 > 48) || (var3 < -48))) {
+      return this->entityData[(202 + var1)];
+   }
+   return (((this->interpPrevEntX[var1] + ((var3 * this->interpAlpha) / 256)) - (this->camTileX * 22)) - var2);
+}
+
+int Game::interpEntY(int var1, int var2) {
+   if (((!interpEnabled || (this->interpAlpha >= 256)) || (this->interpPrevEntY == nullptr))) {
+      return this->entityData[(303 + var1)];
+   }
+   int var3 = (this->interpCurEntY[var1] - this->interpPrevEntY[var1]);
+   if (((var3 > 48) || (var3 < -48))) {
+      return this->entityData[(303 + var1)];
+   }
+   return (((this->interpPrevEntY[var1] + ((var3 * this->interpAlpha) / 256)) - (this->camTileY * 16)) - var2);
+}
+
+int Game::interpProjX(int var1) {
+   if (((!interpEnabled || (this->interpAlpha >= 256)) || (this->interpPrevProjX == nullptr))) {
+      return (((this->entityData[(5252 + var1)] * 22) + 11) + this->entityData[(5454 + var1)]);
+   }
+   int var2 = (this->interpCurProjX[var1] - this->interpPrevProjX[var1]);
+   if (((var2 > 48) || (var2 < -48))) {
+      return (((this->entityData[(5252 + var1)] * 22) + 11) + this->entityData[(5454 + var1)]);
+   }
+   return (this->interpPrevProjX[var1] + ((var2 * this->interpAlpha) / 256));
+}
+
+int Game::interpProjY(int var1) {
+   if (((!interpEnabled || (this->interpAlpha >= 256)) || (this->interpPrevProjY == nullptr))) {
+      return (((this->entityData[(5353 + var1)] * 16) + 8) + this->entityData[(5555 + var1)]);
+   }
+   int var2 = (this->interpCurProjY[var1] - this->interpPrevProjY[var1]);
+   if (((var2 > 48) || (var2 < -48))) {
+      return (((this->entityData[(5353 + var1)] * 16) + 8) + this->entityData[(5555 + var1)]);
+   }
+   return (this->interpPrevProjY[var1] + ((var2 * this->interpAlpha) / 256));
+}
+
+void Game::interpRestore() {
+   if (!this->interpApplied) {
+      return;
+   }
+   (this->scrollXPx = this->interpSavedScrollX);
+   (this->scrollYPx = this->interpSavedScrollY);
+   (this->interpApplied = false);
+}
+
+void Game::interpSnapshot() {
+   for (int i = 0; (i < (this->screenRowsTiles + 3)); i++) {
+      for (int j = 0; (j < this->screenColsTiles); j++) {
+         (this->tileEntityDraw[i][j] = 0);
+      }
+   }
+   if ((this->interpPrevEntX == nullptr)) {
+      (this->interpPrevEntX = newArr<int>(101));
+      (this->interpCurEntX = newArr<int>(101));
+      (this->interpPrevEntY = newArr<int>(101));
+      (this->interpCurEntY = newArr<int>(101));
+      (this->interpPrevProjX = newArr<int>(101));
+      (this->interpCurProjX = newArr<int>(101));
+      (this->interpPrevProjY = newArr<int>(101));
+      (this->interpCurProjY = newArr<int>(101));
+      (this->interpPrevAnimalX = newArr<int>(22));
+      (this->interpCurAnimalX = newArr<int>(22));
+      (this->interpPrevAnimalY = newArr<int>(22));
+      (this->interpCurAnimalY = newArr<int>(22));
+      this->interpCapture();
+      for (int i = 0; (i < 101); i++) {
+         (this->interpPrevEntX[i] = this->interpCurEntX[i]);
+         (this->interpPrevEntY[i] = this->interpCurEntY[i]);
+         (this->interpPrevProjX[i] = this->interpCurProjX[i]);
+         (this->interpPrevProjY[i] = this->interpCurProjY[i]);
+      }
+      for (int i = 0; (i < 22); i++) {
+         (this->interpPrevAnimalX[i] = this->interpCurAnimalX[i]);
+         (this->interpPrevAnimalY[i] = this->interpCurAnimalY[i]);
+      }
+      (this->interpPrevCamX = this->interpCurCamX);
+      (this->interpPrevCamY = this->interpCurCamY);
+      return;
+   }
+   for (int i = 0; (i < 101); i++) {
+      (this->interpPrevEntX[i] = this->interpCurEntX[i]);
+      (this->interpPrevEntY[i] = this->interpCurEntY[i]);
+      (this->interpPrevProjX[i] = this->interpCurProjX[i]);
+      (this->interpPrevProjY[i] = this->interpCurProjY[i]);
+   }
+   for (int i = 0; (i < 22); i++) {
+      (this->interpPrevAnimalX[i] = this->interpCurAnimalX[i]);
+      (this->interpPrevAnimalY[i] = this->interpCurAnimalY[i]);
+   }
+   (this->interpPrevCamX = this->interpCurCamX);
+   (this->interpPrevCamY = this->interpCurCamY);
 }
 
 bool Game::isBuildingFootprintCode(int var0) {
@@ -5044,7 +5201,7 @@ void Game::renderWorldEntities() {
                                  this->drawTile(this->occupantGrid[var7][var8], (int8_t)(1));
                               }
                               if (((tribeOfEntity(var4) == 0) || ((this->entityData[(7979 + var4)] & 2) == 0))) {
-                                 this->drawEntity(var4, (var1 + this->entityData[(202 + var4)]), (var2 + this->entityData[(303 + var4)]), this->entityData[(606 + var4)], (int8_t)(29));
+                                 this->drawEntity(var4, (var1 + this->interpEntX(var4, var1)), (var2 + this->interpEntY(var4, var2)), this->entityData[(606 + var4)], (int8_t)(29));
                               }
                            }
                         } else {
@@ -5111,7 +5268,7 @@ void Game::renderWorldEntities() {
                            } else {
                               if (((var3 < 1) && isObjectId(var4))) {
                                  int var6 = (var4 - 101);
-                                 this->drawEntity(var6, (var1 + this->entityData[(9403 + var6)]), (var2 + this->entityData[(9425 + var6)]), this->entityData[(9491 + var6)], (int8_t)(108));
+                                 this->drawEntity(var6, (var1 + this->interpAnimalX(var6, var1)), (var2 + this->interpAnimalY(var6, var2)), this->entityData[(9491 + var6)], (int8_t)(108));
                               } else {
                                  if (((var3 >= 2) || (!isBuildingFootprintCode(var4) && (tribeOfOccupantCode(var4) != 3)))) {
                                     if ((((var3 == 0) && (var4 <= -114)) && (var4 > -117))) {
@@ -5135,7 +5292,6 @@ void Game::renderWorldEntities() {
                   }
                   if (((((this->renderCol >= 0) && (this->renderCol < this->screenColsTiles)) && (this->renderRow >= 0)) && (this->tileEntityDraw[this->renderRow][this->renderCol] > 0))) {
                      this->drawEntitySprite(this->tileEntityDraw[this->renderRow][this->renderCol]);
-                     (this->tileEntityDraw[this->renderRow][this->renderCol] = 0);
                   }
                   if ((var3 == 1)) {
                      this->b_int_int_int_void(12, (var1 - 2), (var2 - 4));
@@ -5340,30 +5496,70 @@ void Game::run() {
          if (!this->running) {
             return;
          }
-         int64_t var1 = nowMillis();
+         int64_t tickStart = nowMillis();
+         this->interpSnapshot();
          this->tickPauseMusicCheck();
          this->tickUpdate();
          if (!this->running) {
             break;
          }
-         this->renderToBuffer();
-         this->requestRepaint();
-         while ((this->repaintPending && !this->hideRequested)) {
-            Thread::yield();
-         }
-         if (((this->scrollXPx != 0) || (this->scrollYPx != 0))) {
-            (this->scrollXPx = (this->scrollYPx = 0));
-            TribesMIDlet::sleep((this->tickLengthMs / 2));
+         this->interpCapture();
+         if ((interpEnabled && (this->mode == 1))) {
+            int maxRenders = ((this->tickLengthMs / 17) + 1);
+            int renderSteps = 0;
+            int64_t nextRender = tickStart;
+            while (true) {
+               int64_t now = nowMillis();
+               int64_t elapsed = (now - tickStart);
+               if (((elapsed >= this->tickLengthMs) || (renderSteps >= maxRenders))) {
+                  break;
+               }
+               if ((elapsed < (nextRender - tickStart))) {
+                  int64_t wait = (nextRender - now);
+                  if ((wait > 0LL)) {
+                     TribesMIDlet::sleep((int)(wait));
+                  }
+               }
+               (this->interpAlpha = (int)((((nowMillis() - tickStart) * 256) / this->tickLengthMs)));
+               if ((this->interpAlpha > 256)) {
+                  (this->interpAlpha = 256);
+               }
+               (this->interpAdvanceFx = (renderSteps == 0));
+               this->interpApply();
+               this->renderToBuffer();
+               this->requestRepaint();
+               while ((this->repaintPending && !this->hideRequested)) {
+                  Thread::yield();
+               }
+               this->interpRestore();
+               renderSteps++;
+               (nextRender += 17);
+            }
+            int64_t var5 = (nowMillis() - tickStart);
+            if ((((var5 = (this->tickLengthMs - var5)) < 0LL) || (var5 > this->tickLengthMs))) {
+               (var5 = 0LL);
+            }
+            TribesMIDlet::sleep((int)(var5));
+         } else {
+            this->renderToBuffer();
             this->requestRepaint();
             while ((this->repaintPending && !this->hideRequested)) {
                Thread::yield();
             }
+            if (((this->scrollXPx != 0) || (this->scrollYPx != 0))) {
+               (this->scrollXPx = (this->scrollYPx = 0));
+               TribesMIDlet::sleep((this->tickLengthMs / 2));
+               this->requestRepaint();
+               while ((this->repaintPending && !this->hideRequested)) {
+                  Thread::yield();
+               }
+            }
+            int64_t var5 = (nowMillis() - tickStart);
+            if ((((var5 = (this->tickLengthMs - var5)) < 0LL) || (var5 > this->tickLengthMs))) {
+               (var5 = 0LL);
+            }
+            TribesMIDlet::sleep((int)(var5));
          }
-         int64_t var5 = (nowMillis() - var1);
-         if ((((var5 = (this->tickLengthMs - var5)) < 0LL) || (var5 > this->tickLengthMs))) {
-            (var5 = 0LL);
-         }
-         TribesMIDlet::sleep((int)(var5));
       }
    } catch (JavaException& var8) {
    }
@@ -6420,7 +6616,9 @@ void Game::updateBuildAnims() {
                }
             }
          }
-         this->buildAnims[1][var6]++;
+         if (this->interpAdvanceFx) {
+            this->buildAnims[1][var6]++;
+         }
       }
    }
 }
@@ -6484,7 +6682,9 @@ void Game::updateEffects() {
                }
             }
             this->drawSpriteAt(this->effects[0][var12], var2, var3, this->effects[1][var12]);
-            this->effects[1][var12]++;
+            if (this->interpAdvanceFx) {
+               this->effects[1][var12]++;
+            }
             if ((this->effects[1][var12] >= this->pd0ByteTables[9][this->effects[0][var12]])) {
                (this->effects[0][var12] = 0);
             }

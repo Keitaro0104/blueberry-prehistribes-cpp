@@ -55,8 +55,9 @@ const char* canvasName(Canvas* c) {
 void reportState() {
    Canvas* canvas = Display::getDisplay(nullptr)->getCurrent();
    if (Game* game = dynamic_cast<Game*>(canvas)) {
-      std::printf("  state: Game screenId=%d mode=%d frames=%lld\n",
-                  game->screenId, (int)game->mode,
+      std::printf("  state: Game screenId=%d mode=%d ticks=%d interp=%s frames=%lld\n",
+                  game->screenId, (int)game->mode, game->uptimeTicks,
+                  Game::interpEnabled ? "on" : "off",
                   (long long)g_frames.load());
    } else {
       std::printf("  state: canvas=%s frames=%lld\n", canvasName(canvas),
@@ -74,6 +75,7 @@ int main(int argc, char** argv) {
    std::string dumpPath;
    double seconds = 12.0;
    bool play = false;
+   bool noInterp = false;
 
    for (int i = 1; i < argc; i++) {
       std::string a = argv[i];
@@ -97,6 +99,8 @@ int main(int argc, char** argv) {
          i++;
       } else if (a == "--play") {
          play = true;
+      } else if (a == "--no-interp") {
+         noInterp = true;
       } else if (a == "--trace") {
          g_trace = true;
       } else {
@@ -123,6 +127,11 @@ int main(int argc, char** argv) {
                  dataDir.c_str(), saveDir.c_str(), seconds);
    // Discover mods before the game starts (no mods folder = no-op).
    ModLoader::init(modsDir);
+   if (noInterp) {
+      Game::interpEnabled = false;
+   }
+   std::printf("linux_smoke: render interpolation %s\n",
+               Game::interpEnabled ? "ON" : "OFF (--no-interp)");
 
    Canvas::setRepaintCallback(presentFrame);
 
